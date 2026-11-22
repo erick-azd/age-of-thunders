@@ -20,7 +20,7 @@ const FIGURES = {
   4: [['dummy.png', 'O Dummy: piloto-mecha de 1,8 m, branco, azul e laranja, com painéis luminosos.']],
   6: [['transformacao.png', 'Transformação carro → moto: 0%, 25%, 50%, 75% e 100%. As peças sobem num arco, giram e mudam de tamanho em volta do Dummy.']],
   8: [['ilha.png', 'A Ilha do Trovão (~2 km) com a cidade no platô central.'], ['periferia.png', 'Periferia industrial: galpões com telhado em serra, pátio de contêineres com pórtico, via elevada.'], ['via-elevada.png', 'Via elevada a 8 m cruzando a rua, com mureta iluminada.']],
-  9: [['mira.png', 'Em jogo: a torre do canhão no santantônio e a mira no centro da tela.'], ['explosao.png', 'Tiro: clarão, entulho na cor do material e buraco no galpão.']],
+  9: [['mira.png', 'Em jogo: a torre do canhão no santantônio e a mira no centro da tela.'], ['explosao.png', 'Tiro: entulho na cor do material e buraco no galpão.']],
 };
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

@@ -37,3 +37,7 @@ O M0 precisa provar que dá para destruir a cidade atirando, sem travar o jogo. 
 - Smoke: atira com RB, depois 6 tiros na torre central; confere voxels arrancados e subcolunas refeitas; vista `12-cratera.png`. O smoke agora volta ao ponto de partida antes de cada etapa (a derrapagem às vezes deixava o veículo preso numa parede).
 - O entulho é só visual: não bloqueia o veículo nem fica no grid. Prédio sem apoio ainda não desaba (M1).
 - Ainda não há dano em veículos nem alvos: entram na M0.7, com o bot.
+
+## Atualização (22/11/2026): sem esfera na explosão
+
+O Erick achou que a esfera laranja da explosão (a ideia era um clarão, quase uma fumaça) não ficou boa e pediu para tirar por enquanto. A explosão agora mostra só o entulho e o buraco. O clarão pequeno na boca do canhão continua. A classe `Flashes` ficou no código para uma próxima tentativa (por exemplo, partículas de fumaça ou um anel no chão).

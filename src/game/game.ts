@@ -293,7 +293,7 @@ export class Game {
       this.city?.markRemoved(b.removed);
       const g = this.district.grid;
       this.debris.spawn(new THREE.Vector3(b.pos.x, b.pos.y, b.pos.z), b.removed, (x, y, z) => [g.origin.x + (x + 0.5) * VOXEL, g.origin.y + (y + 0.5) * VOXEL, g.origin.z + (z + 0.5) * VOXEL], materialColors(this.districtDef));
-      this.flashes.add(b.pos.x, b.pos.y, b.pos.z, this.weapon.blastRadiusM * 1.3);
+      // Sem esfera de clarão na explosão (o Erick não gostou; ADR 0009, atualização de 22/11).
     }
     if (ev.some((e) => e.type === 'water') || this.state.pos.y < -60) this.respawn();
   }
