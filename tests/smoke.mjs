@@ -102,6 +102,19 @@ await waitFor(() => window.game.debugState().combat.projectiles === 0 && window.
 const c1 = (await st()).combat, d1 = (await st()).district;
 console.log('combate:', JSON.stringify({ shots: c1.shots, blasts: c1.blasts, voxels: c1.voxelsRemoved, debris: c1.debris, remeshed: d1.remeshed }));
 await assert(c1.voxelsRemoved > 50 && d1.remeshed > 0, 'os tiros deveriam arrancar voxels e refazer a malha');
+// Partida (M0.7): o bot anda, o HUD aparece e um alvo cai com tiros
+const m0 = (await st()).match;
+await assert(m0.bots.length === 1 && m0.targets.length === 8, 'a partida deveria ter 1 bot e 8 alvos');
+await assert(await page.evaluate(() => !!document.querySelector('.hud-arcade')?.checkVisibility()), 'o HUD arcade deveria aparecer');
+const tg = m0.targets[0];
+for (let i = 0; i < 6; i++) await page.evaluate((t) => window.game.debugFireAt(t.x, t.y + 1.2, t.z), tg);
+await waitFor(() => window.game.debugState().match.targetsDown >= 1);
+const b0 = m0.bots[0].pos, t0 = (await st()).simTime;
+await waitFor((t) => window.game.debugState().simTime > t + 4, t0);
+const b1 = (await st()).match.bots[0].pos;
+console.log('bot andou', Math.hypot(b1.x - b0.x, b1.z - b0.z).toFixed(0), 'm');
+await assert(Math.hypot(b1.x - b0.x, b1.z - b0.z) > 15, 'o bot deveria andar');
+await shot('13-hud.png');
 const lb = c1.lastBlast;
 const f2 = await page.evaluate(() => window.game.frames);
 await page.evaluate((b) => window.game.debugCamera({ pos: [b[0] + 9, b[1] + 4, b[2] + 14], look: [b[0], b[1], b[2]], fov: 55 }), lb);

@@ -75,7 +75,7 @@ A estudar: o Dummy sair da carcaça e lutar a pé (pistola, katana) num marco po
 
 ## 7. Modos de jogo
 
-- **M0:** arena livre com alvos e um bot simples.
+- **M0:** arena livre com 8 alvos e um bot simples que patrulha, persegue e atira (pronto na M0.7).
 - **M1:** mata-mata contra bots (pontos por abate, reaparecimento).
 - **Futuro:** times, captura de bandeira, online.
 
@@ -89,7 +89,9 @@ Escala futura: mapas grandes como as ilhas do Polygonizer, com espaço para as a
 
 ## 9. HUD, UI e UX
 
-Vida, forma atual e as disponíveis, munição, placar e minimapa. Roda de formas ao segurar o botão de transformar. **Estilo arcade:** barras grandes de vida do jogador e do inimigo no topo, cronômetro grande, mira circular, números em fonte monoespaçada e cores fortes (entra na M0.7). Hoje: velocidade em km/h e a mira circular verde-ciano no centro da tela.
+**Estilo arcade (pronto na M0.7):** barras inclinadas de vida no topo (VOCÊ em verde-ciano à esquerda, INIMIGO em laranja à direita), cronômetro grande no meio, forma e velocidade embaixo à esquerda, abates, derrotas e alvos embaixo à direita, mira circular no centro que pisca ao acertar, faixa "DESTRUÍDO" ao cair. Números em fonte monoespaçada e cores fortes.
+
+A fazer: munição, minimapa e a roda de formas (ao segurar o botão de transformar).
 
 ## 10. Áudio
 
@@ -131,7 +133,8 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 | M0.4 | Moto que inclina | Pronta |
 | M0.5 | Transformação animada por peças | Pronta |
 | M0.6 | Canhão com mira pela câmera, crateras e entulho | Pronta |
-| M0.7 | Alvos, bot, HUD arcade, controles de toque e medição no celular | Próxima |
+| M0.7a | Vida e dano, alvos, bot que patrulha e atira, HUD arcade | Pronta |
+| M0.7b | Controles de toque, perfil de celular e medição de FPS | Próxima |
 
 ## 14. Riscos
 

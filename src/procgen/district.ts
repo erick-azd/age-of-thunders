@@ -485,9 +485,9 @@ export function generateDistrict(def: DistrictDef, origin: Vec3): District {
       } else {
         put(t, top - 2, top - 1, -hw, hw, MAT.PILLAR);
         put(t, top - 1, top, -hw, hw, MAT.ASPHALT);
-        // Pilares no meio dos trechos entre cruzamentos (nunca dentro de um cruzamento).
         const m = t % P;
-        if (!nearLine(t) && (m === P >> 2 || m === P >> 1 || m === (3 * P) >> 2)) put(t - 1, GROUND_TOP, top - 2, -2, 2, MAT.PILLAR), put(t, GROUND_TOP, top - 2, -2, 2, MAT.PILLAR);
+        // Um pilar só, no meio do trecho: longe dos cruzamentos para quem vira para baixo da via.
+        if (!nearLine(t) && m === P >> 1) put(t - 1, GROUND_TOP, top - 2, -2, 2, MAT.PILLAR), put(t, GROUND_TOP, top - 2, -2, 2, MAT.PILLAR);
       }
       // Mureta de 1 m com faixa de luz e marcação de perigo; faixa tracejada no centro.
       const lit = t % 6 < 3;

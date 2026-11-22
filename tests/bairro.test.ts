@@ -112,4 +112,4 @@ test('malha: só faces visíveis, fundidas por material, com brilho por material
   assert.equal(left + right, 8, 'duas metades: topo + 3 laterais cada, sem a face do meio');
 });
 
-const CIDADE_HASH = -59204834; // estilo industrial-militar: torres em recuo, periferia industrial, vias elevadas e luzes (pedido do Erick)
+const CIDADE_HASH = 1387146700; // M0.7: um pilar por trecho de via elevada (o bot batia no pilar perto do cruzamento)

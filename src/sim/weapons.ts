@@ -23,9 +23,10 @@ export const WEAPON_SPECS = [
   { key: 'blastRadiusM', label: 'Raio da explosão', min: 0.5, max: 4, step: 0.1, unit: 'm' },
 ] as const;
 
-export interface Projectile { pos: Vec3; vel: Vec3; life: number }
-/** Explosão: onde foi e o que arrancou ([x, y, z, material, ...] em voxels). */
-export interface Blast { pos: Vec3; removed: number[] }
+/** `owner`: quem atirou (id do combatente; −1 = ninguém). */
+export interface Projectile { pos: Vec3; vel: Vec3; life: number; owner: number }
+/** Explosão: onde foi, o que arrancou ([x, y, z, material, ...] em voxels), quem atirou e em quem acertou direto (−1 = ninguém). */
+export interface Blast { pos: Vec3; removed: number[]; owner: number; struck: number }
 
 export interface ShotWorld {
   solidAt(x: number, y: number, z: number): boolean;
@@ -33,10 +34,10 @@ export interface ShotWorld {
 }
 
 /** Projétil saindo de `from` em direção a `target`. */
-export function fire(from: Vec3, target: Vec3, p: WeaponParams): Projectile {
+export function fire(from: Vec3, target: Vec3, p: WeaponParams, owner = -1): Projectile {
   const dx = target.x - from.x, dy = target.y - from.y, dz = target.z - from.z;
   const len = Math.hypot(dx, dy, dz) || 1;
-  return { pos: v3(from.x, from.y, from.z), vel: v3((dx / len) * p.speed, (dy / len) * p.speed, (dz / len) * p.speed), life: p.lifeS };
+  return { pos: v3(from.x, from.y, from.z), vel: v3((dx / len) * p.speed, (dy / len) * p.speed, (dz / len) * p.speed), life: p.lifeS, owner };
 }
 
 /** Primeiro ponto sólido (voxel ou terreno) no raio, até `range` m; senão o ponto no fim do alcance. */
@@ -49,21 +50,25 @@ export function raycast(w: ShotWorld, o: Vec3, dir: Vec3, range: number, step = 
   return { point: v3(o.x + ux * range, o.y + uy * range, o.z + uz * range), hit: false };
 }
 
-/** Move os projéteis um passo; os que acertam explodem (arrancando voxels) e saem da lista. */
-export function stepProjectiles(list: Projectile[], w: ShotWorld, grid: VoxelGrid, p: WeaponParams, dt: number): Blast[] {
+/**
+ * Move os projéteis um passo; os que acertam explodem (arrancando voxels) e saem da lista.
+ * `strike` (opcional) diz se o projétil, naquele ponto, acertou uma entidade (veículo, alvo): devolve o id ou −1.
+ */
+export function stepProjectiles(list: Projectile[], w: ShotWorld, grid: VoxelGrid, p: WeaponParams, dt: number, strike?: (s: Projectile) => number): Blast[] {
   const blasts: Blast[] = [];
   for (let i = list.length - 1; i >= 0; i--) {
     const s = list[i];
     s.vel.y -= p.gravity * dt;
     s.life -= dt;
     const dist = Math.hypot(s.vel.x, s.vel.y, s.vel.z) * dt, n = Math.max(1, Math.ceil(dist / 0.25));
-    let hit = false;
+    let hit = false, struck = -1;
     for (let k = 0; k < n && !hit; k++) {
       s.pos.x += (s.vel.x * dt) / n; s.pos.y += (s.vel.y * dt) / n; s.pos.z += (s.vel.z * dt) / n;
-      hit = w.solidAt(s.pos.x, s.pos.y, s.pos.z) || s.pos.y < w.groundHeight(s.pos.x, s.pos.z);
+      struck = strike ? strike(s) : -1;
+      hit = struck >= 0 || w.solidAt(s.pos.x, s.pos.y, s.pos.z) || s.pos.y < w.groundHeight(s.pos.x, s.pos.z);
     }
     if (hit) {
-      blasts.push({ pos: v3(s.pos.x, s.pos.y, s.pos.z), removed: grid.carveSphere(s.pos.x, s.pos.y, s.pos.z, p.blastRadiusM) });
+      blasts.push({ pos: v3(s.pos.x, s.pos.y, s.pos.z), removed: grid.carveSphere(s.pos.x, s.pos.y, s.pos.z, p.blastRadiusM), owner: s.owner, struck });
       list.splice(i, 1);
     } else if (s.life <= 0) list.splice(i, 1);
   }

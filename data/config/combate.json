@@ -1,0 +1,16 @@
+{
+  "playerHp": 100,
+  "botHp": 100,
+  "directDamage": 14,
+  "blastDamage": 10,
+  "respawnS": 3,
+  "targets": 8,
+  "targetHp": 30,
+  "targetRespawnS": 15,
+  "bots": 1,
+  "botViewM": 130,
+  "botFireM": 90,
+  "botAimErrorDeg": 3.5,
+  "botCooldownS": 0.6,
+  "botCruise": 0.75
+}
