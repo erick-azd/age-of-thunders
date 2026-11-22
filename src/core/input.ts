@@ -3,9 +3,9 @@ import type { TouchControls } from './touch';
 
 /**
  * Entrada: gamepad (mapeamento "standard") e teclado. Devolve a entrada da sim (pura) a cada passo.
- * Gamepad: analógico esquerdo X = direção, A (0) = acelerar (e confirmar no título), X (2) = freio/ré,
- *          B (1) = freio de mão, Y (3) = trocar de forma, RT (7) ou RB (5) = atirar, analógico direito = mirar.
- *          (22/11/2026: acelerar no A, frear no X e atirar no RT, pedido do Erick para mirar e atirar juntos.)
+ * Gamepad: analógico esquerdo X = direção, LT (6) = acelerar, LB (4) = freio/ré, RT (7) ou RB (5) = atirar,
+ *          B (1) = freio de mão, Y (3) = trocar de forma, analógico direito = mirar, A (0) = confirmar no título.
+ *          (22/11/2026: acelerar e frear na mão esquerda, atirar e mirar na direita, pedido do Erick.)
  * Teclado: W/↑ acelerar, S/↓ freio/ré, A/D ou ←/→ direção, Espaço = freio de mão, Tab ou Q = trocar
  *          de forma, F ou clique = atirar, mouse = mirar (clique no jogo para prender o mouse), Enter = confirmar.
  */
@@ -49,8 +49,8 @@ export class Input {
     let handbrake = k.has('Space');
     if (p) {
       steer = steer || dz(p.axes[0] ?? 0);
-      throttle = Math.max(throttle, p.buttons[0]?.value ?? 0);
-      brake = Math.max(brake, p.buttons[2]?.value ?? 0);
+      throttle = Math.max(throttle, p.buttons[6]?.value ?? 0);
+      brake = Math.max(brake, p.buttons[4]?.value ?? 0);
       handbrake = handbrake || !!p.buttons[1]?.pressed;
     }
     const t = this.touch;

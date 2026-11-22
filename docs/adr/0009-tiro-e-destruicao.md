@@ -49,3 +49,5 @@ No controle, mirar (analógico direito) e atirar (RB ou X) ao mesmo tempo ficou 
 Logo depois, o Erick trocou de novo: **LT acelera** e **RT atira** (RB continua atirando como alternativa); o freio e a ré seguem no **A**.
 
 Terceira troca, também do Erick: **A acelera**, **X freia e dá ré**, **RT atira** (RB como alternativa). O LT ficou livre.
+
+Quarta troca (Erick): **LT acelera** e **LB freia e dá ré**; **RT atira** (RB como alternativa). A mão esquerda pilota e a direita mira e atira. A e X ficaram livres (A segue confirmando no título).
