@@ -33,7 +33,7 @@ Verbos do jogador:
 
 ## 4. Visual e orçamento
 
-- **Personagem:** o Dummy em estilo boneco articulado, montado por código com o `MeshBuilder` (peças rígidas facetadas, juntas pretas). Cor do jogador por time (ex.: dourado, branco, vermelho) + preto.
+- **Personagem:** o Dummy em estilo boneco articulado, montado por código com o `MeshBuilder` (peças rígidas facetadas, juntas pretas). Cor do jogador por time + preto; o Dummy do jogador começa **azul e preto**.
 - **Veículos:** carcaças low-poly chapadas, cor por face, montadas por código a partir de peças que se reorganizam entre as formas.
 - **Mundo:** voxels de **0,5 m** com cor chapada por face, em chunks com malha otimizada (faces vizinhas fundidas). Combina com o low-poly do resto.
 - **Orçamento:** até 150 draw calls por quadro; 30 FPS no celular; build em HTML único.
@@ -61,6 +61,7 @@ O **Dummy é sempre o mesmo personagem** e fica visível: no assento da moto, no
 | Tanque | Resistência e dano alto, lento | M1 |
 | Helicóptero | Pairar e atirar de cima | M2 |
 | Avião | Velocidade no ar, passadas | M2 |
+| Aquáticos (lancha, jet ski, a definir) | Rotas pelo mar, rios e lagos; emboscadas pela água | A definir |
 
 A estudar: o Dummy sair da carcaça e lutar a pé (pistola, katana) num marco posterior.
 
@@ -72,7 +73,9 @@ A estudar: o Dummy sair da carcaça e lutar a pé (pistola, katana) num marco po
 
 ## 8. Arenas
 
-Ilhas urbanas no espírito da ilha do Polygonizer, feitas de voxels: quarteirões, prédios, pontes e água. Toda arena tem: prédios altos destrutíveis, um marco visual central, rotas de chão e de ar, e água nas bordas.
+Ilhas urbanas no espírito da ilha do Polygonizer, feitas de voxels: quarteirões, prédios, pontes e água. Toda arena tem: prédios altos destrutíveis, um marco visual central, rotas de chão, de ar e de água. A água é parte do mapa: **mar em volta da ilha, rios e lagos** por dentro, para os veículos aquáticos.
+
+Escala: mapas grandes como as ilhas do Polygonizer (a primeira ilha e a ilha urbana), com espaço para as aeronaves.
 
 ## 9. HUD, UI e UX
 
@@ -119,3 +122,7 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 - **21/11/2026, oponentes:** bots agora, online depois (Erick).
 - **21/11/2026, M0:** Dummy + carro e hover + arena de voxels destrutível (Erick).
 - **21/11/2026, M0 revisado:** o M0 começa com **carro e moto**; o hover passa para o M1, junto com o tanque (Erick).
+- **21/11/2026, veículos aquáticos:** entram no jogo, com mar em volta da ilha, rios e lagos; marco a definir (Erick).
+- **21/11/2026, escala dos mapas:** mapas grandes como as ilhas do Polygonizer, com espaço para as aeronaves (Erick). A forma técnica (voxel em toda parte ou só nas áreas construídas) está em decisão na proposta do M0.
+- **21/11/2026, Dummy:** azul e preto (Erick).
+- **21/11/2026, M0:** mira pela câmera com torre; parede faz quicar; veículo atropela entulho; transformação mantém a velocidade (Erick).
