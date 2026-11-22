@@ -73,6 +73,7 @@ await shot('02b-derrapagem.png');
 await axis(0, 0);
 await btn(1, 0);
 // Troca para a moto (Y) e faz uma curva: a moto inclina e mantém a velocidade
+await page.evaluate(() => window.game.debugRespawn());
 const s2 = await st();
 await btn(3, 1);
 await waitFor(() => window.game.debugState().form === 'bike');
@@ -90,6 +91,23 @@ await assert(s3.form === 'bike' && Math.abs(s3.lean) > 0.1, 'a moto deveria incl
 await shot('02d-moto.png');
 await axis(0, 0);
 await btn(7, 0);
+// Canhão (M0.6): RB atira na mira; depois 6 tiros na torre central arrancam voxels e refazem a malha
+await page.evaluate(() => window.game.debugRespawn());
+await btn(5, 1);
+await waitFor(() => window.game.debugState().combat.shots >= 2);
+await btn(5, 0);
+const tower = (await st()).tower;
+for (let i = 0; i < 6; i++) await page.evaluate((t) => window.game.debugFireAt(t[0], t[1] + (Math.random() - 0.5) * 3, t[2]), tower);
+await waitFor(() => window.game.debugState().combat.projectiles === 0 && window.game.debugState().combat.blasts >= 6);
+const c1 = (await st()).combat, d1 = (await st()).district;
+console.log('combate:', JSON.stringify({ shots: c1.shots, blasts: c1.blasts, voxels: c1.voxelsRemoved, debris: c1.debris, remeshed: d1.remeshed }));
+await assert(c1.voxelsRemoved > 50 && d1.remeshed > 0, 'os tiros deveriam arrancar voxels e refazer a malha');
+const lb = c1.lastBlast;
+const f2 = await page.evaluate(() => window.game.frames);
+await page.evaluate((b) => window.game.debugCamera({ pos: [b[0] + 9, b[1] + 4, b[2] + 14], look: [b[0], b[1], b[2]], fov: 55 }), lb);
+await waitFor((f) => window.game.frames >= f + 3, f2);
+await shot('12-cratera.png');
+await page.evaluate(() => window.game.debugCamera(null));
 
 const dc = await drawCalls();
 console.log('draw calls =', dc);

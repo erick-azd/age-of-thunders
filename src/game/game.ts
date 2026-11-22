@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import dummyJson from '../../data/config/dummy.json';
+import weaponJson from '../../data/config/canhao.json';
 import carJson from '../../data/config/carro.json';
 import bikeJson from '../../data/config/moto.json';
 import morphJson from '../../data/config/transformacao.json';
@@ -12,13 +13,16 @@ import { DUMMY_SPECS, DummySchema, buildDummyRig } from '../procgen/dummy';
 import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors, materialGlow } from '../procgen/district';
 import { MeshBuilder, hexToRgb } from '../procgen/mesh-builder';
 import { Terrain, WorldSchema } from '../procgen/terrain';
-import { meshRegion } from '../procgen/voxel-mesher';
 import { flatMaterial, toGeometry } from '../render/mesh-utils';
+import { DistrictView } from '../render/district-view';
+import { Bolts, Debris, Flashes, Turret } from '../render/fx';
 import { VehicleView } from '../render/vehicle-view';
 import { DummyView } from '../render/dummy-view';
 import { createSky } from '../render/sky';
 import { Arena } from '../sim/arena';
 import { v3 } from '../sim/math';
+import { VOXEL } from '../sim/voxels';
+import { type Projectile, WEAPON_SPECS, WeaponSchema, fire, raycast, stepProjectiles } from '../sim/weapons';
 import { CAR_SPECS, type CarInput, CarParamsSchema, forwardSpeed, neutralCarInput } from '../sim/car';
 import { type Form, MORPH_SPECS, MorphSchema, type VehicleState, createVehicle, startMorph, stepVehicle } from '../sim/vehicle';
 
@@ -36,7 +40,7 @@ export class Game {
   readonly districtDef = DistrictSchema.parse(districtJson);
   district!: District;
   world!: Arena;
-  private districtMeshes: THREE.Mesh[] = [];
+  private city?: DistrictView;
   private districtTimer = 0;
   private mat = flatMaterial();
   readonly dummyDef = DummySchema.parse(dummyJson);
@@ -46,6 +50,23 @@ export class Game {
   readonly params = CarParamsSchema.parse(carJson);
   readonly bikeParams = CarParamsSchema.parse(bikeJson);
   readonly morphParams = MorphSchema.parse(morphJson);
+  readonly weapon = WeaponSchema.parse(weaponJson);
+  /** Projéteis em voo e tempo até o próximo tiro (estado da simulação). */
+  projectiles: Projectile[] = [];
+  private cooldown = 0;
+  /** Mira: desvio de rumo da câmera em relação ao veículo e inclinação (radianos). */
+  private aimYaw = 0;
+  private aimPitch = 0.06;
+  private aimIdle = 0;
+  /** Ponto para onde a câmera (a mira) aponta agora. */
+  aimPoint = v3();
+  private firing = false;
+  private turret!: Turret;
+  private bolts!: Bolts;
+  private debris!: Debris;
+  private flashes!: Flashes;
+  private crosshair!: HTMLDivElement;
+  stats = { shots: 0, blasts: 0, voxelsRemoved: 0, debrisKicked: 0, lastBlast: [0, 0, 0] as [number, number, number] };
   state: VehicleState;
   private prev: VehicleState;
   private spawn: { x: number; y: number; z: number; heading: number };
@@ -113,6 +134,13 @@ export class Game {
     // Carro do jogador (M0.3): começa na rua central, ao sul, de frente para o centro (−Z).
     this.vehicle = this.makeVehicle();
     this.scene.add(this.vehicle.group);
+    // Combate (M0.6): torre no veículo, projéteis, entulho e clarões.
+    this.turret = new Turret(mat, this.dummyDef.colors);
+    this.vehicle.group.add(this.turret.group);
+    this.bolts = new Bolts(this.dummyDef.colors.glow);
+    this.debris = new Debris(300);
+    this.flashes = new Flashes();
+    this.scene.add(this.bolts.mesh, this.debris.mesh, this.flashes.mesh);
     this.spawn = { x: 2.5, y: def.plateauHeight + 0.5, z: 150, heading: 0 };
     this.state = createVehicle(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading, 'car');
     this.prev = structuredClone(this.state);
@@ -125,11 +153,16 @@ export class Game {
     this.hudEl = document.createElement('div');
     this.hudEl.className = 'hud';
     this.hudEl.hidden = true;
-    ui.append(this.titleEl, this.hudEl);
+    this.crosshair = document.createElement('div');
+    this.crosshair.className = 'crosshair';
+    this.crosshair.hidden = true;
+    ui.append(this.titleEl, this.hudEl, this.crosshair);
+    canvas.addEventListener('click', () => { if (this.screen === 'playing' && !this.input.locked) canvas.requestPointerLock?.(); });
     this.editor = new EditorPanel(ui, [
       { title: 'Carro', specs: CAR_SPECS, values: this.params, file: 'config/carro.json' },
       { title: 'Moto', specs: CAR_SPECS, values: this.bikeParams, file: 'config/moto.json' },
       { title: 'Transformação', specs: MORPH_SPECS, values: this.morphParams, file: 'config/transformacao.json' },
+      { title: 'Canhão', specs: WEAPON_SPECS, values: this.weapon, file: 'config/canhao.json' },
       { title: 'Dummy', specs: DUMMY_SPECS, values: this.dummyDef as unknown as Record<string, number>, file: 'config/dummy.json', onChange: () => this.rebuildDummies() },
       {
         title: 'Cidade (regenera ao mudar)', specs: DISTRICT_SPECS, values: this.districtDef as unknown as Record<string, number>, file: 'world/bairro.json',
@@ -141,25 +174,14 @@ export class Game {
     this.resize();
   }
 
-  /** Gera (ou regenera) o bairro e suas malhas: uma por coluna de 48 × 48 m (1 draw call cada). */
+  /** Gera (ou regenera) a cidade e suas malhas (grupos de 48 × 48 m, 1 draw call cada; ADR 0009). */
   buildDistrict(): void {
-    for (const m of this.districtMeshes) { this.scene.remove(m); m.geometry.dispose(); }
-    this.districtMeshes = [];
+    this.city?.dispose();
     const def = this.districtDef, size = def.sizeM;
     this.district = generateDistrict(def, v3(-size / 2, this.terrain.def.plateauHeight - 0.5, -size / 2));
     if (this.world) { this.world.voxels = this.district.grid; this.buildShowcase(); }
     else this.world = new Arena(this.terrain, this.district.grid);
-    const g = this.district.grid, colors = materialColors(def), glow = materialGlow(def), COL = 96; // 48 × 48 m por malha
-    for (let cz = 0; cz < g.sz; cz += COL) for (let cx = 0; cx < g.sx; cx += COL) {
-      let top = 0;
-      for (let k = cz >> 5; k < Math.min(g.ncz, (cz + COL) >> 5); k++) for (let i = cx >> 5; i < Math.min(g.ncx, (cx + COL) >> 5); i++) top = Math.max(top, g.chunkColumnTop(i, k));
-      const data = meshRegion(g, cx, cz, Math.min(COL, g.sx - cx), Math.min(COL, g.sz - cz), colors, top, glow);
-      if (!data.positions.length) continue;
-      const mesh = new THREE.Mesh(toGeometry(data), this.mat);
-      mesh.name = `bairro-${cx / COL}-${cz / COL}`;
-      this.scene.add(mesh);
-      this.districtMeshes.push(mesh);
-    }
+    this.city = new DistrictView(this.scene, this.district.grid, materialColors(def), materialGlow(def), this.mat);
   }
 
   /**
@@ -215,7 +237,19 @@ export class Game {
     return startMorph(this.state, to ?? (this.state.form === 'car' ? 'bike' : 'car'), this.formParams, this.world);
   }
 
+  /** Dispara da boca do canhão em direção ao alvo. */
+  shoot(target: { x: number; y: number; z: number }): void {
+    this.vehicle.group.updateMatrixWorld(true);
+    const m = new THREE.Vector3();
+    this.turret.muzzle.getWorldPosition(m);
+    this.projectiles.push(fire(v3(m.x, m.y, m.z), v3(target.x, target.y, target.z), this.weapon));
+    this.flashes.add(m.x, m.y, m.z, 0.45);
+    this.cooldown = this.weapon.cooldownS;
+    this.stats.shots++;
+  }
+
   private respawn(): void {
+    this.aimYaw = 0;
     this.state = createVehicle(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading, this.state.form);
     this.prev = structuredClone(this.state);
     this.camYaw = this.state.heading;
@@ -248,6 +282,19 @@ export class Game {
     this.prev = structuredClone(this.state);
     const ev = stepVehicle(this.state, inp, this.formParams, this.morphParams, this.world, STEP);
     this.simTime += STEP;
+    // Canhão: atira na direção da mira; projéteis voam e arrancam voxels.
+    this.cooldown = Math.max(0, this.cooldown - STEP);
+    if (this.firing && this.cooldown === 0) this.shoot(this.aimPoint);
+    const blasts = stepProjectiles(this.projectiles, this.world, this.district.grid, this.weapon, STEP);
+    for (const b of blasts) {
+      this.stats.blasts++;
+      this.stats.voxelsRemoved += b.removed.length / 4;
+      this.stats.lastBlast = [b.pos.x, b.pos.y, b.pos.z];
+      this.city?.markRemoved(b.removed);
+      const g = this.district.grid;
+      this.debris.spawn(new THREE.Vector3(b.pos.x, b.pos.y, b.pos.z), b.removed, (x, y, z) => [g.origin.x + (x + 0.5) * VOXEL, g.origin.y + (y + 0.5) * VOXEL, g.origin.z + (z + 0.5) * VOXEL], materialColors(this.districtDef));
+      this.flashes.add(b.pos.x, b.pos.y, b.pos.z, this.weapon.blastRadiusM * 1.3);
+    }
     if (ev.some((e) => e.type === 'water') || this.state.pos.y < -60) this.respawn();
   }
 
@@ -261,6 +308,14 @@ export class Game {
     }
     if (this.input.formPressed()) this.transform();
     this.lastInput = this.input.read();
+    // Mira: mouse (preso) e analógico direito giram a câmera; parada por 2 s, volta para a frente.
+    const aim = this.input.readAim();
+    const turn = aim.mouseX * 0.0025 + aim.stickX * 2.4 * dt, tilt = -aim.mouseY * 0.0022 - aim.stickY * 1.6 * dt;
+    if (turn || tilt) this.aimIdle = 0; else this.aimIdle += dt;
+    this.aimYaw = Math.atan2(Math.sin(this.aimYaw + turn), Math.cos(this.aimYaw + turn));
+    this.aimPitch = Math.min(0.7, Math.max(-0.35, this.aimPitch + tilt));
+    if (this.aimIdle > 2) { const k = 1 - Math.exp(-2 * dt); this.aimYaw -= this.aimYaw * k; this.aimPitch += (0.06 - this.aimPitch) * k; }
+    this.firing = this.input.fireHeld();
     this.acc += dt;
     while (this.acc >= STEP) { this.step(this.lastInput); this.acc -= STEP; }
   }
@@ -272,6 +327,9 @@ export class Game {
     const view = this.vehicle;
     view.setMorph(s.morphFrom, s.form, L(p.morphT, s.morphT));
     view.update(x, y, z, h, L(p.pitch, s.pitch), L(p.roll, s.roll) + L(p.lean, s.lean), L(p.wheelSpin, s.wheelSpin), L(p.steerVis, s.steerVis));
+    // Torre: no alto do santantônio (carro) ou na rabeta (moto), apontada para a mira.
+    const u = s.form === s.morphFrom ? (s.form === 'car' ? 0 : 1) : s.form === 'bike' ? L(p.morphT, s.morphT) : 1 - L(p.morphT, s.morphT);
+    this.turret.group.position.set(0, 1.92 + (1.05 - 1.92) * u, 0.95 + (0.66 - 0.95) * u);
     if (this.debugCam) {
       const c = this.debugCam;
       this.camera.position.set(...c.pos);
@@ -279,33 +337,66 @@ export class Game {
       this.camera.updateProjectionMatrix();
       this.camera.lookAt(...c.look);
     } else {
-      // Câmera de perseguição: segue o rumo com atraso (gira menos que o carro numa derrapagem).
+      // Câmera de perseguição + mira: segue o rumo com atraso e soma o desvio da mira.
       let d = h - this.camYaw;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       // Suavização pelo tempo real (independe da taxa de quadros); a posição acompanha o carro sem atraso.
       this.camYaw += d * (this.frames === 0 ? 1 : 1 - Math.exp(-5 * this.renderDt));
-      const fx = Math.sin(this.camYaw), fz = -Math.cos(this.camYaw);
-      this.camPos.set(x - fx * 7.5, y + 3.1, z - fz * 7.5);
+      const yaw = this.camYaw + this.aimYaw, pitch = this.aimPitch;
+      const fx = Math.sin(yaw) * Math.cos(pitch), fy = Math.sin(pitch), fz = -Math.cos(yaw) * Math.cos(pitch);
+      const px = x, py = y + 2.0, pz = z; // pivô acima do veículo
+      this.camPos.set(px - fx * 7.5, py + 1.1 - fy * 7.5, pz - fz * 7.5);
+      this.camPos.y = Math.max(this.camPos.y, y + 0.6);
       this.camera.position.copy(this.camPos);
       if (this.camera.fov !== 65) { this.camera.fov = 65; this.camera.updateProjectionMatrix(); }
-      this.camera.lookAt(x + fx * 4, y + 1.3, z + fz * 4);
+      this.camera.lookAt(px + fx * 30, py + 1.1 + fy * 30 - 1.4, pz + fz * 30);
     }
     this.sky.position.copy(this.camera.position);
+    // Mira: o que está no centro da tela (raio da câmera).
+    this.camera.updateMatrixWorld();
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    const hit = raycast(this.world, v3(this.camera.position.x, this.camera.position.y, this.camera.position.z), v3(dir.x, dir.y, dir.z), this.weapon.rangeM, 0.5);
+    this.aimPoint = hit.point;
+    // Torre gira para o alvo (no espaço do veículo).
+    const local = this.vehicle.group.worldToLocal(new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z)).sub(this.turret.group.position);
+    this.turret.group.rotation.y = Math.atan2(-local.x, -local.z);
+    this.turret.barrel.rotation.x = Math.atan2(local.y - 0.2, Math.hypot(local.x, local.z));
+    // Efeitos e re-malha das colunas atingidas (no máximo uma vez por quadro).
+    this.city?.flush();
+    this.bolts.update(this.projectiles);
+    this.flashes.update(this.renderDt);
+    const sp = this.state.vel;
+    this.stats.debrisKicked += this.debris.update(this.renderDt, (qx, qz, ym) => this.world.floorAt(qx, qz, ym), { x, y, z, vx: sp.x, vz: sp.z, radius: this.state.physForm === 'car' ? 1.8 : 1.0 });
+    this.crosshair.hidden = this.screen !== 'playing' || !!this.debugCam;
     this.hudEl.textContent = `${Math.abs(forwardSpeed(s) * 3.6).toFixed(0).padStart(3, ' ')} km/h${s.onGround ? '' : '   NO AR'}`;
     this.renderer.render(this.scene, this.camera);
   }
 
   // ---- API de depuração (smoke test e ferramentas) ----
   debugState() {
-    let triangles = 0;
-    for (const m of this.districtMeshes) triangles += m.geometry.getAttribute('position').count / 3;
+    const triangles = this.city?.triangles() ?? 0;
     return {
       ready: this.ready, screen: this.screen, simTime: this.simTime, form: this.state.form, physForm: this.state.physForm, morphT: this.state.morphT, lean: this.state.lean, pos: { ...this.state.pos }, heading: this.state.heading, speed: forwardSpeed(this.state), onGround: this.state.onGround, wallHits: this.state.wallHits, editorOpen: this.editor.open,
       showcase: this.showcaseSpots,
-      district: { buildings: this.district.buildings.length, sites: this.district.sites.length, viaducts: this.district.viaducts.length, meshes: this.districtMeshes.length, triangles },
+      tower: this.towerCenter(),
+      district: { buildings: this.district.buildings.length, sites: this.district.sites.length, viaducts: this.district.viaducts.length, meshes: this.city?.meshes.length ?? 0, triangles, remeshed: this.city?.remeshed ?? 0 },
+      combat: { ...this.stats, projectiles: this.projectiles.length, debris: this.debris.count, aim: { ...this.aimPoint } },
     };
   }
   debugCamera(c: DebugCamera | null): void { this.debugCam = c; }
+  /** Volta ao ponto de partida (smoke e ferramentas). */
+  debugRespawn(): void { this.respawn(); }
+
+  /** Centro da torre central na meia altura (alvo do smoke). */
+  towerCenter(): [number, number, number] {
+    const t = this.district.buildings.find((b) => b.tower), g = this.district.grid;
+    if (!t) return [0, 0, 0];
+    return [g.origin.x + ((t.x0 + t.x1) / 2) * VOXEL, g.origin.y + 20, g.origin.z + ((t.z0 + t.z1) / 2) * VOXEL];
+  }
+
+  /** Atira do canhão em direção a um ponto do mundo (smoke e ferramentas). */
+  debugFireAt(x: number, y: number, z: number): void { this.shoot({ x, y, z }); }
   /** Transforma e, se `instant`, completa a transformação na hora. */
   debugSetForm(f: Form, instant = true): boolean {
     const ok = this.transform(f);

@@ -94,6 +94,28 @@ export class VoxelGrid {
     return 0;
   }
 
+  /**
+   * Arranca os voxels dentro da esfera (centro em metros, raio em metros). Devolve os removidos como
+   * [x, y, z, material, ...] na ordem y, z, x (determinística): o entulho e a re-malha saem daí.
+   */
+  carveSphere(cx: number, cy: number, cz: number, radius: number): number[] {
+    const out: number[] = [];
+    const r = radius / VOXEL, r2 = r * r;
+    const ix = (cx - this.origin.x) / VOXEL, iy = (cy - this.origin.y) / VOXEL, iz = (cz - this.origin.z) / VOXEL;
+    const y0 = Math.max(0, Math.floor(iy - r)), y1 = Math.min(this.sy - 1, Math.ceil(iy + r));
+    const z0 = Math.max(0, Math.floor(iz - r)), z1 = Math.min(this.sz - 1, Math.ceil(iz + r));
+    const x0 = Math.max(0, Math.floor(ix - r)), x1 = Math.min(this.sx - 1, Math.ceil(ix + r));
+    for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - ix, dy = y + 0.5 - iy, dz = z + 0.5 - iz;
+      if (dx * dx + dy * dy + dz * dz > r2) continue;
+      const m = this.get(x, y, z);
+      if (m === 0) continue;
+      this.set(x, y, z, 0);
+      out.push(x, y, z, m);
+    }
+    return out;
+  }
+
   /** Quantidade de voxels sólidos. */
   count(): number {
     let n = 0;

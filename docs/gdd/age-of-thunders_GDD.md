@@ -50,8 +50,8 @@ Verbos do jogador:
 | Acelerar | RT | W ou ↑ | Botão de acelerar |
 | Freio / ré | LT | S ou ↓ | Botão de freio |
 | Freio de mão (derrapar) | B | Espaço | Botão de derrapar |
-| Câmera / mira | Analógico direito | Mouse | Arrastar na metade direita |
-| Atirar | RT | Botão esquerdo | Botão de tiro |
+| Câmera / mira | Analógico direito | Mouse (clique no jogo para prender; Esc solta) | Arrastar na metade direita |
+| Atirar | RB ou X | Clique esquerdo ou F | Botão de tiro |
 | Transformar | Y (segurar abre a roda, no futuro) | Tab ou Q (1–6 no futuro) | Botão de forma |
 | Ação da forma (turbo, subir) | A | Shift | Botão de ação |
 

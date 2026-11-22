@@ -11,3 +11,14 @@ html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; fon
 .editor h3 { font-size: 13px; margin: 10px 0 4px; color: #9fb4ff; }
 .editor label { display: grid; grid-template-columns: 1fr 90px 60px; gap: 6px; align-items: center; margin: 3px 0; }
 .editor button { margin-top: 6px; }
+
+/* Mira (M0.6): no centro da tela, como o raio da câmera. */
+.crosshair {
+  position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px;
+  border: 2px solid rgba(61, 255, 176, 0.9); border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 6px rgba(61, 255, 176, 0.6);
+}
+.crosshair::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  background: rgba(61, 255, 176, 1); border-radius: 50%;
+}

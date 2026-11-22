@@ -3,14 +3,19 @@ import type { CarInput } from '../sim/car';
 /**
  * Entrada: gamepad (mapeamento "standard") e teclado. Devolve a entrada da sim (pura) a cada passo.
  * Gamepad: analógico esquerdo X = direção, RT (7) = acelerar, LT (6) = freio/ré, B (1) = freio de mão,
- *          Y (3) = trocar de forma, A (0) = confirmar.
+ *          Y (3) = trocar de forma, RB (5) ou X (2) = atirar, analógico direito = mirar, A (0) = confirmar.
  * Teclado: W/↑ acelerar, S/↓ freio/ré, A/D ou ←/→ direção, Espaço = freio de mão, Tab ou Q = trocar
- *          de forma, Enter = confirmar.
+ *          de forma, F ou clique = atirar, mouse = mirar (clique no jogo para prender o mouse), Enter = confirmar.
  */
 export class Input {
   private keys = new Set<string>();
   private prevA = false;
   private prevForm = false;
+  private mouseDX = 0;
+  private mouseDY = 0;
+  private mouseFire = false;
+  /** O mouse está preso no jogo (clique no jogo para prender; Esc solta). */
+  locked = false;
 
   constructor(target: Window) {
     target.addEventListener('keydown', (e) => {
@@ -18,7 +23,11 @@ export class Input {
       if (e.code === 'F1' || e.code === 'Space' || e.code === 'Tab' || e.code.startsWith('Arrow')) e.preventDefault();
     });
     target.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    target.addEventListener('blur', () => this.keys.clear());
+    target.addEventListener('blur', () => { this.keys.clear(); this.mouseFire = false; });
+    target.addEventListener('mousemove', (e) => { if (this.locked) { this.mouseDX += e.movementX; this.mouseDY += e.movementY; } });
+    target.addEventListener('mousedown', (e) => { if (this.locked && e.button === 0) this.mouseFire = true; });
+    target.addEventListener('mouseup', (e) => { if (e.button === 0) this.mouseFire = false; });
+    document.addEventListener('pointerlockchange', () => { this.locked = !!document.pointerLockElement; if (!this.locked) this.mouseFire = false; });
   }
 
   private pad(): Gamepad | null {
@@ -57,6 +66,20 @@ export class Input {
     const edge = now && !this.prevForm;
     this.prevForm = now;
     return edge;
+  }
+
+  /** Atirar (segurar): clique esquerdo com o mouse preso, F, RB (5) ou X (2). */
+  fireHeld(): boolean {
+    const p = this.pad();
+    return this.mouseFire || this.keys.has('KeyF') || !!p?.buttons[5]?.pressed || !!p?.buttons[2]?.pressed;
+  }
+
+  /** Mira: movimento do mouse (px) desde a última leitura e analógico direito (−1 a 1). */
+  readAim(): { mouseX: number; mouseY: number; stickX: number; stickY: number } {
+    const p = this.pad(), dz = (v: number) => (Math.abs(v) < 0.15 ? 0 : v);
+    const out = { mouseX: this.mouseDX, mouseY: this.mouseDY, stickX: dz(p?.axes[2] ?? 0), stickY: dz(p?.axes[3] ?? 0) };
+    this.mouseDX = this.mouseDY = 0;
+    return out;
   }
 
   has(code: string): boolean { return this.keys.has(code); }
