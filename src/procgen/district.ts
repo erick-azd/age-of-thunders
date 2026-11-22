@@ -24,9 +24,17 @@ export const DistrictSchema = z.object({
   floorsMin: z.number().int().min(1).max(30),
   floorsMax: z.number().int().min(1).max(30),
   towerFloors: z.number().int().min(0).max(40),
+  /** Centro de prédios: meia-largura (m, distância no eixo). Fora dele, a periferia de casas. */
+  coreHalfM: z.number().min(0).max(512).default(128),
+  houseLotM: z.number().min(8).max(32).default(12),
+  houseTwoFloorChance: z.number().min(0).max(1).default(0.3),
+  treeChance: z.number().min(0).max(1).default(0.6),
   palette: z.object({
     asphalt: Hex, lane: Hex, sidewalk: Hex, roof: Hex, trim: Hex, glass: Hex, antenna: Hex,
     walls: z.array(Hex).min(1).max(16),
+    grass: Hex, trunk: Hex, leaf: Hex, door: Hex,
+    roofTiles: z.array(Hex).min(1).max(8),
+    houseWalls: z.array(Hex).min(1).max(8),
   }),
 });
 export type DistrictDef = z.infer<typeof DistrictSchema>;
@@ -40,24 +48,38 @@ export const DISTRICT_SPECS = [
   { key: 'blockPitchM', label: 'Quarteirão + rua', min: 32, max: 128, step: 8, unit: 'm' },
   { key: 'streetM', label: 'Largura da rua', min: 6, max: 16, step: 1, unit: 'm' },
   { key: 'sidewalkM', label: 'Calçada', min: 1, max: 6, step: 0.5, unit: 'm' },
+  { key: 'coreHalfM', label: 'Raio do centro (prédios)', min: 0, max: 192, step: 32, unit: 'm' },
+  { key: 'houseLotM', label: 'Lote de casa', min: 8, max: 24, step: 1, unit: 'm' },
+  { key: 'houseTwoFloorChance', label: 'Casas de 2 andares', min: 0, max: 1, step: 0.05 },
+  { key: 'treeChance', label: 'Árvores nos quintais', min: 0, max: 1, step: 0.05 },
 ] as const;
 
-/** Materiais (o valor do voxel). Paredes usam WALL0 + índice da paleta. */
-export const MAT = { ASPHALT: 1, LANE: 2, SIDEWALK: 3, ROOF: 4, TRIM: 5, GLASS: 6, ANTENNA: 7, WALL0: 10 } as const;
+/**
+ * Materiais (o valor do voxel). Paredes de prédio: WALL0 + índice; telhas: TILE0 + índice;
+ * paredes de casa: HOUSE0 + índice.
+ */
+export const MAT = {
+  ASPHALT: 1, LANE: 2, SIDEWALK: 3, ROOF: 4, TRIM: 5, GLASS: 6, ANTENNA: 7, GRASS: 8, TRUNK: 9,
+  LEAF: 30, DOOR: 31, WALL0: 10, TILE0: 32, HOUSE0: 40,
+} as const;
 
 /** Cor de cada material, indexada pelo valor do voxel. */
 export function materialColors(def: DistrictDef): RGB[] {
   const P = def.palette, out: RGB[] = [];
   const set = (i: number, hex: string) => { out[i] = hexToRgb(hex); };
-  for (let i = 0; i < MAT.WALL0 + P.walls.length; i++) out[i] = [1, 0, 1];
+  for (let i = 0; i < MAT.HOUSE0 + P.houseWalls.length; i++) out[i] = [1, 0, 1];
   set(MAT.ASPHALT, P.asphalt); set(MAT.LANE, P.lane); set(MAT.SIDEWALK, P.sidewalk); set(MAT.ROOF, P.roof);
   set(MAT.TRIM, P.trim); set(MAT.GLASS, P.glass); set(MAT.ANTENNA, P.antenna);
-  P.walls.forEach((w, i) => set(MAT.WALL0 + i, w));
+  set(MAT.GRASS, P.grass); set(MAT.TRUNK, P.trunk); set(MAT.LEAF, P.leaf); set(MAT.DOOR, P.door);
+  P.walls.slice(0, MAT.LEAF - MAT.WALL0).forEach((w, i) => set(MAT.WALL0 + i, w));
+  P.roofTiles.forEach((w, i) => set(MAT.TILE0 + i, w));
+  P.houseWalls.forEach((w, i) => set(MAT.HOUSE0 + i, w));
   return out;
 }
 
 export interface Building { x0: number; z0: number; x1: number; z1: number; floors: number; tower: boolean }
-export interface District { grid: VoxelGrid; buildings: Building[]; def: DistrictDef }
+export interface House { x0: number; z0: number; x1: number; z1: number; floors: number }
+export interface District { grid: VoxelGrid; buildings: Building[]; houses: House[]; def: DistrictDef }
 
 /** Camadas (em voxels): asfalto em y 0–1, calçada e base dos lotes em y 2, prédios a partir de y 3. */
 export const GROUND_TOP = 2;
@@ -75,6 +97,9 @@ export function generateDistrict(def: DistrictDef, origin: Vec3): District {
   const F = Math.max(4, Math.round(def.floorM * V));
   const floorsMax = Math.max(def.floorsMin, def.floorsMax);
   const buildings: Building[] = [];
+  const houses: House[] = [];
+  const hrnd = mulberry32(def.seed ^ 0x51ed27);
+  const coreHalf = def.coreHalfM * V;
 
   // Asfalto em todo o bairro.
   g.fill(0, 0, 0, N, GROUND_TOP, N, MAT.ASPHALT);
@@ -115,9 +140,92 @@ export function generateDistrict(def: DistrictDef, origin: Vec3): District {
       buildings.push(b);
       continue;
     }
-    split(lot.x0, lot.z0, lot.x1, lot.z1, 0);
+    const cheb = Math.max(Math.abs((x0 + x1) / 2 - N / 2), Math.abs((z0 + z1) / 2 - N / 2));
+    if (cheb < coreHalf) split(lot.x0, lot.z0, lot.x1, lot.z1, 0);
+    else houseBlock(lot.x0, lot.z0, lot.x1, lot.z1);
   }
-  return { grid: g, buildings, def };
+  return { grid: g, buildings, houses, def };
+
+  /** Quarteirão de periferia: gramado, casas viradas para a rua na borda e quintais com árvores no meio. */
+  function houseBlock(x0: number, z0: number, x1: number, z1: number): void {
+    g.fill(x0, GROUND_TOP, z0, x1, GROUND_TOP + 1, z1, MAT.GRASS);
+    const L = Math.max(16, Math.round(def.houseLotM * V));
+    const nx = Math.max(1, Math.floor((x1 - x0) / L)), nz = Math.max(1, Math.floor((z1 - z0) / L));
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const cx0 = x0 + Math.floor(((x1 - x0) * i) / nx), cx1 = x0 + Math.floor(((x1 - x0) * (i + 1)) / nx);
+      const cz0 = z0 + Math.floor(((z1 - z0) * j) / nz), cz1 = z0 + Math.floor(((z1 - z0) * (j + 1)) / nz);
+      // Frente da casa: o lado do lote que encosta na rua (−x, +x, −z, +z); lote interno vira quintal.
+      const face = j === 0 ? 2 : j === nz - 1 ? 3 : i === 0 ? 0 : i === nx - 1 ? 1 : -1;
+      if (face < 0) { if (hrnd() < def.treeChance) tree((cx0 + cx1) >> 1, (cz0 + cz1) >> 1); continue; }
+      house(cx0, cz0, cx1, cz1, face);
+    }
+  }
+
+  function house(cx0: number, cz0: number, cx1: number, cz1: number, face: number): void {
+    const cw = cx1 - cx0, cd = cz1 - cz0;
+    const hw = Math.min(cw - 4, 14 + Math.floor(hrnd() * 7)), hd = Math.min(cd - 4, 14 + Math.floor(hrnd() * 7));
+    if (hw < 10 || hd < 10) return;
+    const front = 3 + Math.floor(hrnd() * 2); // jardim da frente
+    // Encosta na frente do lote; centralizado no outro eixo.
+    let hx0 = cx0 + ((cw - hw) >> 1), hz0 = cz0 + ((cd - hd) >> 1);
+    if (face === 0) hx0 = cx0 + front; else if (face === 1) hx0 = cx1 - front - hw;
+    else if (face === 2) hz0 = cz0 + front; else hz0 = cz1 - front - hd;
+    const h: House = { x0: hx0, z0: hz0, x1: hx0 + hw, z1: hz0 + hd, floors: hrnd() < def.houseTwoFloorChance ? 2 : 1 };
+    const wall = MAT.HOUSE0 + Math.floor(hrnd() * def.palette.houseWalls.length);
+    const tile = MAT.TILE0 + Math.floor(hrnd() * def.palette.roofTiles.length);
+    const top = BUILD_Y + h.floors * F;
+    // Paredes ocas com janelas; porta no meio da frente.
+    const side = (p: number, len: number, y: number, isFront: boolean): number => {
+      const fy = (y - BUILD_Y) % F, floor = Math.floor((y - BUILD_Y) / F), mid = len >> 1;
+      if (isFront && floor === 0 && fy <= 4 && (p === mid || p === mid - 1)) return MAT.DOOR;
+      if (fy >= 2 && fy <= 3 && p >= 2 && p <= len - 3 && (p % 5 === 2 || p % 5 === 3) && !(isFront && Math.abs(p - mid + 0.5) < 2.5 && floor === 0)) return MAT.GLASS;
+      return wall;
+    };
+    for (let y = BUILD_Y; y < top; y++) {
+      for (let x = h.x0; x < h.x1; x++) {
+        g.set(x, y, h.z0, side(x - h.x0, hw, y, face === 2));
+        g.set(x, y, h.z1 - 1, side(x - h.x0, hw, y, face === 3));
+      }
+      for (let z = h.z0 + 1; z < h.z1 - 1; z++) {
+        g.set(h.x0, y, z, side(z - h.z0, hd, y, face === 0));
+        g.set(h.x1 - 1, y, z, side(z - h.z0, hd, y, face === 1));
+      }
+    }
+    if (h.floors > 1) g.fill(h.x0 + 1, BUILD_Y + F, h.z0 + 1, h.x1 - 1, BUILD_Y + F + 1, h.z1 - 1, wall);
+    // Telhado de duas águas em degraus de 45°, cumeeira no eixo mais comprido, beiral de 1 voxel.
+    const ridgeX = hw >= hd;
+    for (let k = 0; ; k++) {
+      const y = top + k;
+      if (ridgeX) {
+        const a = h.z0 - 1 + k, b = h.z1 + 1 - k;
+        if (b - a <= 0) break;
+        if (b - a <= 2) { g.fill(h.x0, y, a, h.x1, y + 1, b, tile); break; }
+        for (let x = h.x0; x < h.x1; x++) { g.set(x, y, a, tile); g.set(x, y, b - 1, tile); }
+        for (let z = a + 1; z < b - 1; z++) { g.set(h.x0, y, z, wall); g.set(h.x1 - 1, y, z, wall); }
+      } else {
+        const a = h.x0 - 1 + k, b = h.x1 + 1 - k;
+        if (b - a <= 0) break;
+        if (b - a <= 2) { g.fill(a, y, h.z0, b, y + 1, h.z1, tile); break; }
+        for (let z = h.z0; z < h.z1; z++) { g.set(a, y, z, tile); g.set(b - 1, y, z, tile); }
+        for (let x = a + 1; x < b - 1; x++) { g.set(x, y, h.z0, wall); g.set(x, y, h.z1 - 1, wall); }
+      }
+    }
+    houses.push(h);
+    // Árvore no quintal dos fundos, se couber.
+    if (hrnd() < def.treeChance) {
+      const tx = face === 0 ? cx1 - 4 : face === 1 ? cx0 + 3 : (cx0 + cx1) >> 1;
+      const tz = face === 2 ? cz1 - 4 : face === 3 ? cz0 + 3 : (cz0 + cz1) >> 1;
+      if (tx < h.x0 - 3 || tx > h.x1 + 2 || tz < h.z0 - 3 || tz > h.z1 + 2) tree(tx, tz);
+    }
+  }
+
+  /** Árvore de voxel: tronco de 2 m e copa de 2,5 × 2 × 2,5 m sem os cantos. */
+  function tree(x: number, z: number): void {
+    const y = BUILD_Y, s = 2 + Math.floor(hrnd() * 2);
+    g.fill(x, y, z, x + 1, y + 4, z + 1, MAT.TRUNK);
+    g.fill(x - s, y + 3, z - s, x + s + 1, y + 4 + s + 1, z + s + 1, MAT.LEAF);
+    for (const dy of [y + 3, y + 4 + s]) for (const [dx, dz] of [[-s, -s], [s, -s], [-s, s], [s, s]]) g.set(x + dx, dy, z + dz, 0);
+  }
 
   /** Divide o lote em prédios (vielas de 2 m entre eles). */
   function split(x0: number, z0: number, x1: number, z1: number, depth: number): void {
@@ -133,7 +241,7 @@ export function generateDistrict(def: DistrictDef, origin: Vec3): District {
     const b = { x0: x0 + inset, z0: z0 + inset, x1: x1 - inset, z1: z1 - inset, floors: 0, tower: false };
     if (b.x1 - b.x0 < 12 || b.z1 - b.z0 < 12) return;
     // Mais alto perto do centro do bairro.
-    const c = 1 - Math.min(1, Math.hypot((b.x0 + b.x1) / 2 - N / 2, (b.z0 + b.z1) / 2 - N / 2) / (N / 2));
+    const c = 1 - Math.min(1, Math.hypot((b.x0 + b.x1) / 2 - N / 2, (b.z0 + b.z1) / 2 - N / 2) / Math.max(1, coreHalf));
     const t = clamp(rnd() * 0.65 + c * 0.55, 0, 1);
     b.floors = Math.min(def.floorsMin + Math.round((floorsMax - def.floorsMin) * t), Math.floor((H - BUILD_Y - 3) / F));
     const wall = MAT.WALL0 + Math.floor(rnd() * def.palette.walls.length);

@@ -46,6 +46,25 @@ test('bairro: calçada é meio-fio de 1 voxel (0,5 m) e a torre é o ponto mais 
   assert.ok(P > 0);
 });
 
+test('periferia: casas só fora do centro, baixas, com porta para a rua e gramado no lote', () => {
+  const N = g.sx, core = def.coreHalfM / VOXEL;
+  assert.ok(district.houses.length >= 60, `poucas casas: ${district.houses.length}`);
+  for (const h of district.houses) {
+    const cheb = Math.max(Math.abs((h.x0 + h.x1) / 2 - N / 2), Math.abs((h.z0 + h.z1) / 2 - N / 2));
+    assert.ok(cheb >= core - 48, `casa dentro do centro em (${h.x0}, ${h.z0})`);
+    const top = g.topAt(origin.x + ((h.x0 + h.x1) / 2) * VOXEL, origin.z + ((h.z0 + h.z1) / 2) * VOXEL) - origin.y;
+    assert.ok(top < 14, `casa alta demais: ${top.toFixed(1)} m`);
+  }
+  for (const b of district.buildings) {
+    const cheb = Math.max(Math.abs((b.x0 + b.x1) / 2 - N / 2), Math.abs((b.z0 + b.z1) / 2 - N / 2));
+    assert.ok(cheb < core, `prédio fora do centro em (${b.x0}, ${b.z0})`);
+  }
+  let doors = 0, grass = 0;
+  for (const c of g.chunks) if (c) for (let i = 0; i < c.length; i++) { if (c[i] === MAT.DOOR) doors++; else if (c[i] === MAT.GRASS) grass++; }
+  assert.ok(doors >= district.houses.length * 8, 'toda casa tem porta (2 × 5 voxels)');
+  assert.ok(grass > 50000, 'lotes da periferia são gramados');
+});
+
 test('arena: terreno no platô fica escondido sob o asfalto; prédio é sólido, rua não', () => {
   const terrain = new Terrain(terrainDef).generate();
   const arena = new Arena(terrain, g);
@@ -78,4 +97,4 @@ test('malha: só faces visíveis, fundidas por material', () => {
   assert.equal(left + right, 8, 'duas metades: topo + 3 laterais cada, sem a face do meio');
 });
 
-const BAIRRO_HASH = 21704978; // M0.1: bairro inicial (seed 2077, 256 m, quarteirões de 64 m)
+const BAIRRO_HASH = -719087486; // M0.1b: cidade de 384 m (centro de 256 m + anel de casas), pedido do Erick

@@ -9,7 +9,7 @@
   "coastNoise": 0.2,
   "seaFloor": -40,
   "trees": 1200,
-  "plateauHalf": 150,
+  "plateauHalf": 215,
   "plateauBlend": 160,
   "plateauHeight": 14,
   "palette": {

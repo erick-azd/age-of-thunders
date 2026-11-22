@@ -128,7 +128,7 @@ export class Game {
     this.resize();
   }
 
-  /** Gera (ou regenera) o bairro e suas malhas: uma por coluna de 32 × 32 m (1 draw call cada). */
+  /** Gera (ou regenera) o bairro e suas malhas: uma por coluna de 48 × 48 m (1 draw call cada). */
   buildDistrict(): void {
     for (const m of this.districtMeshes) { this.scene.remove(m); m.geometry.dispose(); }
     this.districtMeshes = [];
@@ -136,7 +136,7 @@ export class Game {
     this.district = generateDistrict(def, v3(-size / 2, this.terrain.def.plateauHeight - 0.5, -size / 2));
     if (this.world) this.world.voxels = this.district.grid;
     else this.world = new Arena(this.terrain, this.district.grid);
-    const g = this.district.grid, colors = materialColors(def), COL = 64;
+    const g = this.district.grid, colors = materialColors(def), COL = 96; // 48 × 48 m por malha
     for (let cz = 0; cz < g.sz; cz += COL) for (let cx = 0; cx < g.sx; cx += COL) {
       let top = 0;
       for (let k = cz >> 5; k < Math.min(g.ncz, (cz + COL) >> 5); k++) for (let i = cx >> 5; i < Math.min(g.ncx, (cx + COL) >> 5); i++) top = Math.max(top, g.chunkColumnTop(i, k));
@@ -219,7 +219,7 @@ export class Game {
     for (const m of this.districtMeshes) triangles += m.geometry.getAttribute('position').count / 3;
     return {
       ready: this.ready, screen: this.screen, simTime: this.simTime, pos: { ...this.state.pos }, speed: this.state.speed, crashed: this.state.crashed, editorOpen: this.editor.open,
-      district: { buildings: this.district.buildings.length, meshes: this.districtMeshes.length, triangles },
+      district: { buildings: this.district.buildings.length, houses: this.district.houses.length, meshes: this.districtMeshes.length, triangles },
     };
   }
   debugCamera(c: DebugCamera | null): void { this.debugCam = c; }

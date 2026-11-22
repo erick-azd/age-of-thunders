@@ -39,3 +39,16 @@ O Erick quer mapas do tamanho das ilhas do Polygonizer e destruição total esti
 - Os triângulos internos dos prédios ocos são desenhados (paredes por dentro). Se o celular sofrer, a primeira economia é cortar faces internas não visíveis de fora.
 - Rios e lagos ainda não existem (só o mar); entram quando os veículos aquáticos tiverem marco.
 - Redesenhar uma coluna depois de um tiro é o assunto da M0.6.
+
+## Atualização (21/11/2026): cidade dobrada com periferia de casas
+
+Pedido do Erick: dobrar a área urbana com casas na periferia.
+
+- Cidade de **384 × 384 m** (2,25× a área): o centro de prédios continua com 256 m (`coreHalfM` = 128) e ganhou um anel de quarteirões de casas em volta. Platô da ilha alargado para 215 m.
+- **Casas** (`houseBlock`, `house` em `district.ts`): lotes de 12 m gramados; as casas ficam na borda do quarteirão, viradas para a rua, com jardim na frente, e o miolo do quarteirão vira quintal com árvores. 1 ou 2 andares (30%), paredes ocas, porta de 1 × 2,5 m, janelas e telhado de duas águas em degraus de 45° com beiral. 6 cores de parede e 4 de telha.
+- **Árvores de voxel** nos quintais: tronco de 2 m e copa arredondada.
+- Novos parâmetros no F1: raio do centro, lote de casa, chance de 2 andares e de árvores.
+- Malhas por coluna de 48 × 48 m (eram 32 m) para manter **64 malhas**: 69 draw calls na vista da cidade inteira.
+- Medido: 59 prédios, **240 casas**, ~2,9 milhões de voxels em 820 chunks (~26 MB), **~310 mil triângulos**.
+- Hashes atualizados de propósito: cidade `-719087486`, ilha `-1438949356` (751 árvores).
+- Ponto de atenção: memória e triângulos subiram; no celular, a primeira economia continua sendo cortar as faces internas, e a segunda, chunks menores no eixo vertical para não alocar 32 KB por chunk quase vazio de chão.

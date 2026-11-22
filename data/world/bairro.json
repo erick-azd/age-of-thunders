@@ -1,8 +1,8 @@
 {
   "id": "bairro",
-  "name": "Bairro Central",
+  "name": "Cidade do Trovão",
   "seed": 2077,
-  "sizeM": 256,
+  "sizeM": 384,
   "heightM": 64,
   "blockPitchM": 64,
   "streetM": 10,
@@ -11,6 +11,10 @@
   "floorsMin": 2,
   "floorsMax": 12,
   "towerFloors": 18,
+  "coreHalfM": 128,
+  "houseLotM": 12,
+  "houseTwoFloorChance": 0.3,
+  "treeChance": 0.6,
   "palette": {
     "asphalt": "#4a4d55",
     "lane": "#e8e2c8",
@@ -19,6 +23,32 @@
     "trim": "#3a3c44",
     "glass": "#7fb4d6",
     "antenna": "#d8423a",
-    "walls": ["#d9cbb0", "#c98f6b", "#e6e1d6", "#a9b8c4", "#cfb37a", "#b8806a", "#9aa59a"]
+    "walls": [
+      "#d9cbb0",
+      "#c98f6b",
+      "#e6e1d6",
+      "#a9b8c4",
+      "#cfb37a",
+      "#b8806a",
+      "#9aa59a"
+    ],
+    "grass": "#6cbf4e",
+    "trunk": "#6b4a2e",
+    "leaf": "#3f9a3c",
+    "door": "#5a3a24",
+    "roofTiles": [
+      "#b5532f",
+      "#9c3f2a",
+      "#c9773f",
+      "#5d5f6b"
+    ],
+    "houseWalls": [
+      "#f2e6c9",
+      "#e8c9a0",
+      "#f4f1ea",
+      "#cfe0d8",
+      "#f0d2c2",
+      "#d9d2e6"
+    ]
   }
 }
