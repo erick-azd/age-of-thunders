@@ -52,7 +52,7 @@ Verbos do jogador:
 | Freio de mão (derrapar) | B | Espaço | Botão de derrapar |
 | Câmera / mira | Analógico direito | Mouse | Arrastar na metade direita |
 | Atirar | RT | Botão esquerdo | Botão de tiro |
-| Transformar | Y (segurar abre a roda) | Q / 1–6 | Botão de forma |
+| Transformar | Y (segurar abre a roda, no futuro) | Tab ou Q (1–6 no futuro) | Botão de forma |
 | Ação da forma (turbo, subir) | A | Shift | Botão de ação |
 
 ## 6. O Dummy e as formas

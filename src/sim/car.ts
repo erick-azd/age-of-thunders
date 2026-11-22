@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { DEG, clamp, lerp, v3, type Vec3 } from './math';
 
 /**
- * Carro arcade (M0.3, ADR 0006), puro e determinístico. Física de "caixa que desliza":
+ * Veículo de chão arcade (carro M0.3, ADR 0006; moto M0.4, ADR 0007), puro e determinístico.
+ * Carro e moto usam a mesma física com parâmetros diferentes (`carro.json`, `moto.json`); a moto
+ * inclina nas curvas (`leanMaxDeg`) e nunca cai. Física de "caixa que desliza":
  * velocidade decomposta em frente/lado, aderência lateral que mata o lado (menos com freio de mão,
  * o que dá a derrapagem), degrau automático até `stepUp` (meio-fio de 0,5 m), paredes que fazem
  * quicar e perder velocidade, gravidade quando sai do chão. O mundo é só `CarWorld`.
@@ -27,6 +29,8 @@ export const CarParamsSchema = z.object({
   width: z.number().min(0.5).max(5).default(2),
   length: z.number().min(1).max(8).default(4.2),
   height: z.number().min(0.5).max(4).default(1.4),
+  /** Inclinação máxima nas curvas (moto); 0 = não inclina (carro). Só visual: a moto nunca cai. */
+  leanMaxDeg: z.number().min(0).max(60).default(0),
 });
 export type CarParams = z.infer<typeof CarParamsSchema>;
 
@@ -42,6 +46,7 @@ export const CAR_SPECS = [
   { key: 'stepUp', label: 'Degrau que sobe', min: 0, max: 1, step: 0.05, unit: 'm' },
   { key: 'bounce', label: 'Quique na parede', min: 0, max: 1, step: 0.05 },
   { key: 'gravity', label: 'Gravidade', min: 5, max: 50, step: 1, unit: 'm/s²' },
+  { key: 'leanMaxDeg', label: 'Inclinação máxima (moto)', min: 0, max: 60, step: 1, unit: '°' },
 ] as const;
 
 /** O que o carro sabe do mundo. */
@@ -55,7 +60,7 @@ export interface CarWorld {
 /** Estado só com dados. `pos` é o centro do carro no nível do chão. */
 export interface CarState {
   pos: Vec3; heading: number; vel: Vec3; onGround: boolean;
-  pitch: number; roll: number; wheelSpin: number; steerVis: number; time: number; wallHits: number;
+  pitch: number; roll: number; lean: number; wheelSpin: number; steerVis: number; time: number; wallHits: number;
 }
 export interface CarInput { throttle: number; brake: number; steer: number; handbrake: boolean }
 export type CarEvent = { type: 'wall'; speed: number } | { type: 'land'; speed: number } | { type: 'water' };
@@ -63,7 +68,7 @@ export type CarEvent = { type: 'wall'; speed: number } | { type: 'land'; speed: 
 export const neutralCarInput = (): CarInput => ({ throttle: 0, brake: 0, steer: 0, handbrake: false });
 
 export function createCar(pos: Vec3, heading: number): CarState {
-  return { pos: v3(pos.x, pos.y, pos.z), heading, vel: v3(), onGround: true, pitch: 0, roll: 0, wheelSpin: 0, steerVis: 0, time: 0, wallHits: 0 };
+  return { pos: v3(pos.x, pos.y, pos.z), heading, vel: v3(), onGround: true, pitch: 0, roll: 0, lean: 0, wheelSpin: 0, steerVis: 0, time: 0, wallHits: 0 };
 }
 
 /** Velocidade para a frente (m/s, negativa em ré). */
@@ -123,6 +128,9 @@ export function stepCar(s: CarState, inp: CarInput, p: CarParams, w: CarWorld, d
     const yaw = clamp(inp.steer, -1, 1) * p.turnRateDeg * DEG * k * Math.sign(vF) * (inp.handbrake ? p.handbrakeTurn : 1);
     const nh = s.heading + yaw * dt;
     if (!bodyHits(w, p, s.pos.x, s.pos.y, s.pos.z, nh)) s.heading = nh;
+    // Inclinação da moto: o ângulo que equilibra a aceleração lateral (v · ω / g), limitado.
+    const leanT = p.leanMaxDeg > 0 ? clamp(Math.atan((vF * yaw) / 9.8), -p.leanMaxDeg * DEG, p.leanMaxDeg * DEG) : 0;
+    s.lean += (leanT - s.lean) * Math.min(1, dt * 8);
     vR *= Math.exp(-(inp.handbrake ? p.handbrakeGrip : p.grip) * dt);
     if (inp.handbrake) vF *= Math.exp(-0.5 * dt);
     fx = Math.sin(s.heading); fz = -Math.cos(s.heading);
@@ -170,4 +178,9 @@ export function stepCar(s: CarState, inp: CarInput, p: CarParams, w: CarWorld, d
   s.steerVis += (clamp(inp.steer, -1, 1) * 0.45 - s.steerVis) * Math.min(1, dt * 10);
   if (s.pos.y < w.waterHeight(s.pos.x, s.pos.z) - 0.8) ev.push({ type: 'water' });
   return ev;
+}
+
+/** A carroceria destes parâmetros cabe onde o veículo está agora? (troca de forma sem entrar na parede) */
+export function fitsAt(s: CarState, p: CarParams, w: CarWorld): boolean {
+  return !bodyHits(w, p, s.pos.x, s.pos.y, s.pos.z, s.heading);
 }

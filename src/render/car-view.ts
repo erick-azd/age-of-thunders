@@ -5,7 +5,8 @@ import { DummyView } from './dummy-view';
 import { linearColors } from './mesh-utils';
 
 /**
- * Vista do carro: carroceria (1 draw call), 4 rodas instanciadas (1) e o Dummy sentado (1).
+ * Vista de um veículo de chão (carro ou moto): carroceria (1 draw call), rodas instanciadas (1) e o
+ * Dummy sentado ou montado (1).
  * Recebe o estado já interpolado; não conhece a física.
  */
 export class CarView {
@@ -30,7 +31,7 @@ export class CarView {
     };
     const body = new THREE.Mesh(geo(model.body), material);
     body.name = 'carro';
-    this.wheels = new THREE.InstancedMesh(geo(model.wheel), material, 4);
+    this.wheels = new THREE.InstancedMesh(geo(model.wheel), material, model.wheels.length);
     this.wheels.name = 'rodas';
     this.wheels.frustumCulled = false;
     this.dummy = new DummyView(rig, material);
@@ -44,7 +45,7 @@ export class CarView {
     this.group.position.set(x, y, z);
     this.group.rotation.set(pitch, -heading, -roll);
     this.model.wheels.forEach((w, i) => {
-      this.e.set(-spin, i < 2 ? -steer : 0, 0);
+      this.e.set(-spin, i < this.model.steerWheels ? -steer : 0, 0);
       this.q.setFromEuler(this.e);
       this.m.compose(new THREE.Vector3(w[0], w[1], w[2]), this.q, this.one);
       this.wheels.setMatrixAt(i, this.m);

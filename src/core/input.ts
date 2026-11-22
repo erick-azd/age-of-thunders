@@ -3,17 +3,19 @@ import type { CarInput } from '../sim/car';
 /**
  * Entrada: gamepad (mapeamento "standard") e teclado. Devolve a entrada da sim (pura) a cada passo.
  * Gamepad: analógico esquerdo X = direção, RT (7) = acelerar, LT (6) = freio/ré, B (1) = freio de mão,
- *          A (0) = confirmar.
- * Teclado: W/↑ acelerar, S/↓ freio/ré, A/D ou ←/→ direção, Espaço = freio de mão, Enter = confirmar.
+ *          Y (3) = trocar de forma, A (0) = confirmar.
+ * Teclado: W/↑ acelerar, S/↓ freio/ré, A/D ou ←/→ direção, Espaço = freio de mão, Tab ou Q = trocar
+ *          de forma, Enter = confirmar.
  */
 export class Input {
   private keys = new Set<string>();
   private prevA = false;
+  private prevForm = false;
 
   constructor(target: Window) {
     target.addEventListener('keydown', (e) => {
       this.keys.add(e.code);
-      if (e.code === 'F1' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+      if (e.code === 'F1' || e.code === 'Space' || e.code === 'Tab' || e.code.startsWith('Arrow')) e.preventDefault();
     });
     target.addEventListener('keyup', (e) => this.keys.delete(e.code));
     target.addEventListener('blur', () => this.keys.clear());
@@ -46,6 +48,14 @@ export class Input {
     const now = this.keys.has('Enter') || !!this.pad()?.buttons[0]?.pressed;
     const edge = now && !this.prevA;
     this.prevA = now;
+    return edge;
+  }
+
+  /** Troca de forma (Tab ou Y) acabou de ser apertada. */
+  formPressed(): boolean {
+    const now = this.keys.has('Tab') || this.keys.has('KeyQ') || !!this.pad()?.buttons[3]?.pressed;
+    const edge = now && !this.prevForm;
+    this.prevForm = now;
     return edge;
   }
 

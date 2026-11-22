@@ -72,6 +72,19 @@ await waitFor((t) => window.game.debugState().simTime > t + 0.5, s1.simTime);
 await shot('02b-derrapagem.png');
 await axis(0, 0);
 await btn(1, 0);
+// Troca para a moto (Y) e faz uma curva: a moto inclina e mantém a velocidade
+const s2 = await st();
+await btn(3, 1);
+await waitFor(() => window.game.debugState().form === 'bike');
+await btn(3, 0);
+await btn(7, 1);
+await axis(0, 0.6);
+await waitFor((t) => window.game.debugState().simTime > t + 0.6, s2.simTime);
+const s3 = await st();
+await assert(s3.form === 'bike' && Math.abs(s3.lean) > 0.1, 'a moto deveria inclinar na curva');
+await shot('02c-moto.png');
+await axis(0, 0);
+await btn(7, 0);
 
 const dc = await drawCalls();
 console.log('draw calls =', dc);
