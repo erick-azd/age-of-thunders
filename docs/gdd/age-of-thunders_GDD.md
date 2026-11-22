@@ -1,6 +1,6 @@
 # Age of Thunders — Game Design Document
 
-**Versão:** 0.2 · 22/11/2026 · **Dono do design:** Erick · **Implementação:** Claude Code
+**Versão:** 0.3 · 22/11/2026 · **Dono do design:** Erick · **Implementação:** Claude Code
 
 ## 1. Visão
 
@@ -136,7 +136,7 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 | M0.6 | Canhão com mira pela câmera, crateras e entulho | Pronta |
 | M0.7a | Vida e dano, alvos, bot que patrulha e atira, HUD arcade | Pronta |
 | M0.7b | Controles de toque, perfil de celular e medidor de FPS | Pronta |
-| Portão | O Erick joga no desktop e no celular e aprova | Aguardando |
+| Portão | O Erick jogou no desktop e aprovou (22/11/2026); teste no celular pendente | Aprovado |
 
 ## 14. Riscos
 
@@ -162,4 +162,5 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 - **21/11/2026, cidade:** dobrada para 384 m; estilo **industrial-militar** no lugar do bairro residencial ("bucólico demais"): periferia industrial, torres mais altas e variadas, faixas de luz, vias elevadas, antenas e helipontos (Erick).
 - **22/11/2026, estilo arcade:** o jogo inteiro (Dummy, cidade e HUD) segue o estilo dos arcades de mecha dos anos 90; o Dummy fica com 1,8 m e passa a branco, azul e laranja com painéis luminosos (substitui o "azul e preto" de 21/11) (Erick).
 - **22/11/2026, controle:** mão esquerda pilota (analógico esquerdo, LT acelera, LB freia e dá ré), mão direita combate (analógico direito mira, RT atira); em teste (Erick).
+- **22/11/2026, portão do M0:** aprovado no desktop; merge do `m0` na `main`. O teste no celular fica pendente e será medido no M1 (Erick).
 - **22/11/2026, repositório:** github.com/erick-azd/age-of-thunders; merge do `m0` na `main` só com a aprovação do portão (Erick).
