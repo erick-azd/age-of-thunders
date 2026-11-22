@@ -4,7 +4,7 @@ import districtJson from '../../data/world/bairro.json';
 import worldJson from '../../data/world/mundo.json';
 import { Input } from '../core/input';
 import { EditorPanel } from '../editor/panel';
-import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors } from '../procgen/district';
+import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors, materialGlow } from '../procgen/district';
 import { MeshBuilder, hexToRgb } from '../procgen/mesh-builder';
 import { Terrain, WorldSchema } from '../procgen/terrain';
 import { meshRegion } from '../procgen/voxel-mesher';
@@ -119,7 +119,7 @@ export class Game {
     this.editor = new EditorPanel(ui, [
       { title: 'Veículo', specs: PLAYER_SPECS, values: this.params, file: 'config/player.json' },
       {
-        title: 'Bairro (regenera ao mudar)', specs: DISTRICT_SPECS, values: this.districtDef as unknown as Record<string, number>, file: 'world/bairro.json',
+        title: 'Cidade (regenera ao mudar)', specs: DISTRICT_SPECS, values: this.districtDef as unknown as Record<string, number>, file: 'world/bairro.json',
         onChange: () => { window.clearTimeout(this.districtTimer); this.districtTimer = window.setTimeout(() => this.buildDistrict(), 250); },
       },
     ]);
@@ -136,11 +136,11 @@ export class Game {
     this.district = generateDistrict(def, v3(-size / 2, this.terrain.def.plateauHeight - 0.5, -size / 2));
     if (this.world) this.world.voxels = this.district.grid;
     else this.world = new Arena(this.terrain, this.district.grid);
-    const g = this.district.grid, colors = materialColors(def), COL = 96; // 48 × 48 m por malha
+    const g = this.district.grid, colors = materialColors(def), glow = materialGlow(def), COL = 96; // 48 × 48 m por malha
     for (let cz = 0; cz < g.sz; cz += COL) for (let cx = 0; cx < g.sx; cx += COL) {
       let top = 0;
       for (let k = cz >> 5; k < Math.min(g.ncz, (cz + COL) >> 5); k++) for (let i = cx >> 5; i < Math.min(g.ncx, (cx + COL) >> 5); i++) top = Math.max(top, g.chunkColumnTop(i, k));
-      const data = meshRegion(g, cx, cz, Math.min(COL, g.sx - cx), Math.min(COL, g.sz - cz), colors, top);
+      const data = meshRegion(g, cx, cz, Math.min(COL, g.sx - cx), Math.min(COL, g.sz - cz), colors, top, glow);
       if (!data.positions.length) continue;
       const mesh = new THREE.Mesh(toGeometry(data), this.mat);
       mesh.name = `bairro-${cx / COL}-${cz / COL}`;
@@ -219,7 +219,7 @@ export class Game {
     for (const m of this.districtMeshes) triangles += m.geometry.getAttribute('position').count / 3;
     return {
       ready: this.ready, screen: this.screen, simTime: this.simTime, pos: { ...this.state.pos }, speed: this.state.speed, crashed: this.state.crashed, editorOpen: this.editor.open,
-      district: { buildings: this.district.buildings.length, houses: this.district.houses.length, meshes: this.districtMeshes.length, triangles },
+      district: { buildings: this.district.buildings.length, sites: this.district.sites.length, viaducts: this.district.viaducts.length, meshes: this.districtMeshes.length, triangles },
     };
   }
   debugCamera(c: DebugCamera | null): void { this.debugCam = c; }

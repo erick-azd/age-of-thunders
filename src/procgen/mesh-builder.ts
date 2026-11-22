@@ -10,6 +10,8 @@ export type V = [number, number, number];
 export interface MeshData {
   positions: number[];
   colors: number[];
+  /** Brilho por vértice (0 a 1), opcional: faixas de luz que acendem mesmo na sombra. */
+  glow?: number[];
 }
 
 export function hexToRgb(hex: string): RGB {

@@ -10,11 +10,12 @@ const BELOW = 255;
  * material num quad só. Puro (sem Three.js); devolve triângulos não indexados com cor por face.
  * Os vizinhos fora da região são lidos do grid, então colunas lado a lado não desenham faces internas.
  */
-export function meshRegion(g: VoxelGrid, x0: number, z0: number, w: number, d: number, colors: RGB[], top = g.sy): MeshData {
+export function meshRegion(g: VoxelGrid, x0: number, z0: number, w: number, d: number, colors: RGB[], top = g.sy, glowTable?: number[]): MeshData {
   const positions: number[] = [];
   const out: number[] = [];
+  const glow: number[] | undefined = glowTable ? [] : undefined;
   const H = Math.min(top, g.sy);
-  if (H <= 0) return { positions, colors: out };
+  if (H <= 0) return { positions, colors: out, glow };
 
   // Cópia densa da região com 1 voxel de borda (leitura rápida no laço).
   const px = w + 2, py = H + 2, pz = d + 2;
@@ -70,7 +71,8 @@ export function meshRegion(g: VoxelGrid, x0: number, z0: number, w: number, d: n
           // e_u × e_v = e_dd: a ordem p0 → p1 → p2 dá normal +dd.
           const tris = c > 0 ? [p0, p1, p2, p0, p2, p3] : [p0, p2, p1, p0, p3, p2];
           const col = colors[Math.abs(c)] ?? [1, 0, 1];
-          for (const p of tris) { positions.push(p[0], p[1], p[2]); out.push(col[0], col[1], col[2]); }
+          const gl = glowTable?.[Math.abs(c)] ?? 0;
+          for (const p of tris) { positions.push(p[0], p[1], p[2]); out.push(col[0], col[1], col[2]); glow?.push(gl); }
           for (let l = 0; l < hq; l++) for (let k = 0; k < wq; k++) mask[n + k + l * dims[u]] = 0;
           i += wq;
           n += wq;
@@ -78,5 +80,5 @@ export function meshRegion(g: VoxelGrid, x0: number, z0: number, w: number, d: n
       }
     }
   }
-  return { positions, colors: out };
+  return { positions, colors: out, glow };
 }

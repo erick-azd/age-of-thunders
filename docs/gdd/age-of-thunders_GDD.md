@@ -36,6 +36,7 @@ Verbos do jogador:
 - **Personagem:** o Dummy em estilo boneco articulado, montado por código com o `MeshBuilder` (peças rígidas facetadas, juntas pretas). Cor do jogador por time + preto; o Dummy do jogador começa **azul e preto**.
 - **Veículos:** carcaças low-poly chapadas, cor por face, montadas por código a partir de peças que se reorganizam entre as formas.
 - **Mundo:** voxels de **0,5 m** com cor chapada por face, em chunks com malha otimizada (faces vizinhas fundidas). Combina com o low-poly do resto.
+- **Cidade: industrial-militar.** Concreto escuro, aço, janelas em fita, faixas de perigo amarelo e preto, faixas de luz ciano nas fachadas, luzes vermelhas em antenas e chaminés. Centro de torres em recuo (algumas gêmeas com passarela, helipontos no topo) e periferia de galpões, pátios de contêineres, tanques e data centers. Vias elevadas sobre as ruas.
 - **Orçamento:** até 150 draw calls por quadro; 30 FPS no celular; build em HTML único.
 - **Perfis visuais:** padrão e celular (distância de visão e entulho menores no celular).
 
@@ -125,4 +126,5 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 - **21/11/2026, veículos aquáticos:** entram no jogo, com mar em volta da ilha, rios e lagos; marco a definir (Erick).
 - **21/11/2026, escala dos mapas:** mapas grandes como as ilhas do Polygonizer, com espaço para as aeronaves (Erick). A forma técnica (voxel em toda parte ou só nas áreas construídas) está em decisão na proposta do M0.
 - **21/11/2026, Dummy:** azul e preto (Erick).
+- **21/11/2026, cidade:** dobrada para 384 m; estilo **industrial-militar** no lugar do bairro residencial ("bucólico demais"): periferia de galpões e instalações industriais, torres mais altas e variadas, faixas de luz, vias elevadas, antenas e helipontos (Erick).
 - **21/11/2026, M0:** mira pela câmera com torre; parede faz quicar; veículo atropela entulho; transformação mantém a velocidade (Erick).
