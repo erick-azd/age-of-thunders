@@ -41,3 +41,7 @@ O M0 precisa provar que dá para destruir a cidade atirando, sem travar o jogo. 
 ## Atualização (22/11/2026): sem esfera na explosão
 
 O Erick achou que a esfera laranja da explosão (a ideia era um clarão, quase uma fumaça) não ficou boa e pediu para tirar por enquanto. A explosão agora mostra só o entulho e o buraco. Logo depois, a pedido dele, saiu também o clarão pequeno da boca do canhão: o tiro mostra só o projétil, o entulho e o buraco. A classe `Flashes` ficou no código para uma próxima tentativa (por exemplo, partículas de fumaça ou um anel no chão).
+
+## Atualização (22/11/2026): tiro no gatilho esquerdo
+
+No controle, mirar (analógico direito) e atirar (RB ou X) ao mesmo tempo ficou difícil. Pedido do Erick, em teste: **LT atira** (RB continua como alternativa) e **A freia e dá ré** (A segue confirmando na tela de título). X deixou de atirar. Teclado, mouse e toque não mudaram.

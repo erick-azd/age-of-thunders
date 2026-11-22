@@ -91,11 +91,11 @@ await assert(s3.form === 'bike' && Math.abs(s3.lean) > 0.1, 'a moto deveria incl
 await shot('02d-moto.png');
 await axis(0, 0);
 await btn(7, 0);
-// Canhão (M0.6): RB atira na mira; depois 6 tiros na torre central arrancam voxels e refazem a malha
+// Canhão (M0.6): LT atira na mira; depois 6 tiros na torre central arrancam voxels e refazem a malha
 await page.evaluate(() => window.game.debugRespawn());
-await btn(5, 1);
+await btn(6, 1);
 await waitFor(() => window.game.debugState().combat.shots >= 2);
-await btn(5, 0);
+await btn(6, 0);
 const tower = (await st()).tower;
 for (let i = 0; i < 6; i++) await page.evaluate((t) => window.game.debugFireAt(t[0], t[1] + (Math.random() - 0.5) * 3, t[2]), tower);
 await waitFor(() => window.game.debugState().combat.projectiles === 0 && window.game.debugState().combat.blasts >= 6);
