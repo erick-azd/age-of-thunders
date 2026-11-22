@@ -1,14 +1,17 @@
 import * as THREE from 'three';
+import dummyJson from '../../data/config/dummy.json';
 import playerJson from '../../data/config/player.json';
 import districtJson from '../../data/world/bairro.json';
 import worldJson from '../../data/world/mundo.json';
 import { Input } from '../core/input';
 import { EditorPanel } from '../editor/panel';
+import { DUMMY_SPECS, DummySchema, buildDummyRig } from '../procgen/dummy';
 import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors, materialGlow } from '../procgen/district';
 import { MeshBuilder, hexToRgb } from '../procgen/mesh-builder';
 import { Terrain, WorldSchema } from '../procgen/terrain';
 import { meshRegion } from '../procgen/voxel-mesher';
 import { flatMaterial, toGeometry } from '../render/mesh-utils';
+import { DummyView } from '../render/dummy-view';
 import { createSky } from '../render/sky';
 import { Arena } from '../sim/arena';
 import { v3 } from '../sim/math';
@@ -43,6 +46,10 @@ export class Game {
   private districtMeshes: THREE.Mesh[] = [];
   private districtTimer = 0;
   private mat = flatMaterial();
+  readonly dummyDef = DummySchema.parse(dummyJson);
+  private showcase = new THREE.Group();
+  /** Vitrine do Dummy (M0.2): posição de cada pose, para câmeras e screenshots. */
+  showcaseSpots: Record<string, [number, number, number]> = {};
   readonly params = PlayerParamsSchema.parse(playerJson);
   state: PlayerState;
   private prev: PlayerState;
@@ -101,6 +108,8 @@ export class Game {
 
     // Bairro de voxels no platô central (mapa híbrido, ADR 0002).
     this.buildDistrict();
+    this.scene.add(this.showcase);
+    this.buildShowcase();
 
     this.playerMesh = new THREE.Mesh(toGeometry(buildGlider().build()), mat);
     this.scene.add(this.playerMesh);
@@ -118,6 +127,7 @@ export class Game {
     ui.append(this.titleEl, this.hudEl);
     this.editor = new EditorPanel(ui, [
       { title: 'Veículo', specs: PLAYER_SPECS, values: this.params, file: 'config/player.json' },
+      { title: 'Dummy', specs: DUMMY_SPECS, values: this.dummyDef as unknown as Record<string, number>, file: 'config/dummy.json', onChange: () => this.buildShowcase() },
       {
         title: 'Cidade (regenera ao mudar)', specs: DISTRICT_SPECS, values: this.districtDef as unknown as Record<string, number>, file: 'world/bairro.json',
         onChange: () => { window.clearTimeout(this.districtTimer); this.districtTimer = window.setTimeout(() => this.buildDistrict(), 250); },
@@ -134,7 +144,7 @@ export class Game {
     this.districtMeshes = [];
     const def = this.districtDef, size = def.sizeM;
     this.district = generateDistrict(def, v3(-size / 2, this.terrain.def.plateauHeight - 0.5, -size / 2));
-    if (this.world) this.world.voxels = this.district.grid;
+    if (this.world) { this.world.voxels = this.district.grid; this.buildShowcase(); }
     else this.world = new Arena(this.terrain, this.district.grid);
     const g = this.district.grid, colors = materialColors(def), glow = materialGlow(def), COL = 96; // 48 × 48 m por malha
     for (let cz = 0; cz < g.sz; cz += COL) for (let cx = 0; cx < g.sx; cx += COL) {
@@ -147,6 +157,54 @@ export class Game {
       this.scene.add(mesh);
       this.districtMeshes.push(mesh);
     }
+  }
+
+  /**
+   * Vitrine da M0.2: o Dummy nas quatro poses lado a lado, no gramado ao sul da cidade,
+   * virado para +Z. As poses sentadas ganham um assento provisório (o veículo de verdade vem na M0.3).
+   */
+  buildShowcase(): void {
+    for (const c of [...this.showcase.children]) { this.showcase.remove(c); (c as THREE.Mesh).geometry?.dispose(); }
+    this.showcaseSpots = {};
+    // No gramado do platô, logo depois da borda sul da cidade, com a cidade ao fundo.
+    const g = this.district.grid;
+    const cx = 0, z = g.origin.z + g.sz * 0.5 + 12, y = this.terrain.groundHeight(cx, z);
+    const rig = buildDummyRig(this.dummyDef);
+    const dark = hexToRgb('#2a2d33'), seatC = hexToRgb('#3d4148'), steel = hexToRgb('#7c838a');
+    const seats: Record<string, number> = { car: 0.45, bike: 0.85 };
+    const order = ['tpose', 'standing', 'car', 'bike'];
+    order.forEach((name, i) => {
+      const pose = this.dummyDef.poses[name];
+      if (!pose) return;
+      const x = cx + (i - (order.length - 1) / 2) * 2.6;
+      const seatY = seats[name] ?? 0;
+      const view = new DummyView(rig, this.mat);
+      view.setPose(pose);
+      view.mesh.position.set(x, y + seatY, z);
+      view.mesh.rotation.y = Math.PI;
+      this.showcase.add(view.mesh);
+      this.showcaseSpots[name] = [x, y, z];
+      if (!seatY) return;
+      // Assento provisório (no espaço do personagem: frente em −Z).
+      const b = new MeshBuilder();
+      if (name === 'car') {
+        b.push().translate(0, -0.12, 0.02).box(0.5, 0.12, 0.5, seatC).pop();
+        b.push().translate(0, 0.25, 0.28).rotateX(-0.2).box(0.5, 0.7, 0.1, seatC).pop();
+        b.push().translate(0, -0.3, 0).box(0.3, 0.3, 0.3, dark).pop();
+        b.push().translate(0, 0.42, -0.5).rotateX(0.35).torus(0.19, 0.025, 12, 4, dark).pop();
+        b.push().translate(0, -0.42, -0.78).box(0.5, 0.06, 0.3, dark).pop();
+      } else {
+        b.push().translate(0, -0.08, 0.05).box(0.26, 0.1, 0.6, seatC).pop();
+        b.push().translate(0, 0.0, -0.45).box(0.3, 0.22, 0.45, steel).pop();
+        b.push().translate(0, 0.35, -0.72).box(0.7, 0.04, 0.04, dark).pop();
+        b.push().translate(0, -0.45, -0.1).box(0.2, 0.6, 0.8, dark).pop();
+        for (const sx of [-0.2, 0.2]) b.push().translate(sx, -0.62, 0.2).box(0.18, 0.03, 0.08, steel).pop();
+      }
+      const prop = new THREE.Mesh(toGeometry(b.build()), this.mat);
+      prop.position.copy(view.mesh.position);
+      prop.rotation.y = Math.PI;
+      this.showcase.add(prop);
+    });
   }
 
   private resize(): void {
@@ -219,6 +277,7 @@ export class Game {
     for (const m of this.districtMeshes) triangles += m.geometry.getAttribute('position').count / 3;
     return {
       ready: this.ready, screen: this.screen, simTime: this.simTime, pos: { ...this.state.pos }, speed: this.state.speed, crashed: this.state.crashed, editorOpen: this.editor.open,
+      showcase: this.showcaseSpots,
       district: { buildings: this.district.buildings.length, sites: this.district.sites.length, viaducts: this.district.viaducts.length, meshes: this.districtMeshes.length, triangles },
     };
   }

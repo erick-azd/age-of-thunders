@@ -102,6 +102,9 @@ await view('08-periferia.png', { pos: [175, 32, 230], look: [120, 15, 120], fov:
 await view('09-via-elevada.png', { pos: [-125, 15.8, -92], look: [-131, 21, -150], fov: 75 });
 await view('06-rua.png', { pos: [2, 16.2, 110], look: [0, 22, 0], fov: 65 });
 await view('07-ilha.png', { pos: [900, 420, 900], look: [0, 20, 0], fov: 55 });
+const spots = (await st()).showcase;
+await assert(Object.keys(spots).length === 4, 'a vitrine do Dummy deveria ter 4 poses');
+await view('10-dummy.png', { pos: [0, spots.tpose[1] + 1.5, spots.tpose[2] + 8.5], look: [0, spots.tpose[1] + 0.9, spots.tpose[2]], fov: 55 });
 const dcCity = await drawCalls();
 console.log('draw calls (bairro) =', dcCity);
 await assert(dcCity <= 150, `acima do orçamento de 150 draw calls no bairro: ${dcCity}`);
