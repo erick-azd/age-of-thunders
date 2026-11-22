@@ -1,0 +1,26 @@
+{
+  "name": "age-of-thunders",
+  "version": "0.0.1-m0",
+  "private": true,
+  "description": "Age of Thunders — jogo 3D low-poly para navegador",
+  "type": "module",
+  "scripts": {
+    "dev": "node build.mjs --serve",
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test tests/*.test.ts",
+    "smoke": "node tests/smoke.mjs"
+  },
+  "dependencies": {
+    "three": "0.170.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/three": "0.170.0",
+    "esbuild": "0.28.2",
+    "playwright": "1.56.0",
+    "tsx": "^4.20.0",
+    "typescript": "6.0.3"
+  }
+}

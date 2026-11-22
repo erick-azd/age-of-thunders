@@ -1,0 +1,23 @@
+{
+  "id": "mundo",
+  "name": "Ilha de Teste",
+  "seed": 1993,
+  "size": 4000,
+  "resolution": 129,
+  "islandRadius": 1700,
+  "hillHeight": 260,
+  "coastNoise": 0.2,
+  "seaFloor": -40,
+  "trees": 1500,
+  "palette": {
+    "sand": "#ecd39a",
+    "grass": ["#63bf4f", "#57b347", "#4aa63f"],
+    "rock": "#8f857a",
+    "snow": "#f2f5f8",
+    "forest": "#2f8a36",
+    "ocean": "#1c9cc4",
+    "skyZenith": "#1d5fd6",
+    "skyHorizon": "#a9d8f2",
+    "skyGround": "#7fc0e0"
+  }
+}

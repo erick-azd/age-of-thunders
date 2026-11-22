@@ -1,0 +1,8 @@
+{
+  "maxSpeed": 90,
+  "accel": 25,
+  "drag": 0.35,
+  "turnRateDeg": 70,
+  "climbRate": 28,
+  "minAgl": 3
+}
