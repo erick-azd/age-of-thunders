@@ -2,30 +2,30 @@ import * as THREE from 'three';
 import dummyJson from '../../data/config/dummy.json';
 import carJson from '../../data/config/carro.json';
 import bikeJson from '../../data/config/moto.json';
+import morphJson from '../../data/config/transformacao.json';
 import districtJson from '../../data/world/bairro.json';
 import worldJson from '../../data/world/mundo.json';
 import { Input } from '../core/input';
 import { EditorPanel } from '../editor/panel';
-import { buildBikeModel, buildCarModel } from '../procgen/car-model';
+import { buildBikeShape, buildCarShape } from '../procgen/vehicle-shape';
 import { DUMMY_SPECS, DummySchema, buildDummyRig } from '../procgen/dummy';
 import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors, materialGlow } from '../procgen/district';
 import { MeshBuilder, hexToRgb } from '../procgen/mesh-builder';
 import { Terrain, WorldSchema } from '../procgen/terrain';
 import { meshRegion } from '../procgen/voxel-mesher';
 import { flatMaterial, toGeometry } from '../render/mesh-utils';
-import { CarView } from '../render/car-view';
+import { VehicleView } from '../render/vehicle-view';
 import { DummyView } from '../render/dummy-view';
 import { createSky } from '../render/sky';
 import { Arena } from '../sim/arena';
 import { v3 } from '../sim/math';
-import { CAR_SPECS, type CarInput, CarParamsSchema, type CarState, createCar, fitsAt, forwardSpeed, neutralCarInput, stepCar } from '../sim/car';
+import { CAR_SPECS, type CarInput, CarParamsSchema, forwardSpeed, neutralCarInput } from '../sim/car';
+import { type Form, MORPH_SPECS, MorphSchema, type VehicleState, createVehicle, startMorph, stepVehicle } from '../sim/vehicle';
 
 /** Passo fixo da simulação (60 Hz); a renderização interpola entre o passo anterior e o atual. */
 export const STEP = 1 / 60;
 
 type Screen = 'title' | 'playing';
-/** Formas do M0. A transformação animada entra na M0.5; por enquanto a troca é instantânea. */
-export type Form = 'car' | 'bike';
 export interface DebugCamera { pos: [number, number, number]; look: [number, number, number]; fov?: number }
 
 export class Game {
@@ -45,14 +45,13 @@ export class Game {
   showcaseSpots: Record<string, [number, number, number]> = {};
   readonly params = CarParamsSchema.parse(carJson);
   readonly bikeParams = CarParamsSchema.parse(bikeJson);
-  form: Form = 'car';
-  private bike!: CarView;
-  state: CarState;
-  private prev: CarState;
+  readonly morphParams = MorphSchema.parse(morphJson);
+  state: VehicleState;
+  private prev: VehicleState;
   private spawn: { x: number; y: number; z: number; heading: number };
   private input = new Input(window);
   private lastInput: CarInput = neutralCarInput();
-  private car!: CarView;
+  private vehicle!: VehicleView;
   private camYaw = 0;
   private renderDt = 0;
   private editor: EditorPanel;
@@ -112,12 +111,10 @@ export class Game {
     this.buildShowcase();
 
     // Carro do jogador (M0.3): começa na rua central, ao sul, de frente para o centro (−Z).
-    this.car = this.makeCar();
-    this.bike = this.makeBike();
-    this.bike.group.visible = false;
-    this.scene.add(this.car.group, this.bike.group);
+    this.vehicle = this.makeVehicle();
+    this.scene.add(this.vehicle.group);
     this.spawn = { x: 2.5, y: def.plateauHeight + 0.5, z: 150, heading: 0 };
-    this.state = createCar(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading);
+    this.state = createVehicle(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading, 'car');
     this.prev = structuredClone(this.state);
     this.camYaw = this.state.heading;
 
@@ -132,6 +129,7 @@ export class Game {
     this.editor = new EditorPanel(ui, [
       { title: 'Carro', specs: CAR_SPECS, values: this.params, file: 'config/carro.json' },
       { title: 'Moto', specs: CAR_SPECS, values: this.bikeParams, file: 'config/moto.json' },
+      { title: 'Transformação', specs: MORPH_SPECS, values: this.morphParams, file: 'config/transformacao.json' },
       { title: 'Dummy', specs: DUMMY_SPECS, values: this.dummyDef as unknown as Record<string, number>, file: 'config/dummy.json', onChange: () => this.rebuildDummies() },
       {
         title: 'Cidade (regenera ao mudar)', specs: DISTRICT_SPECS, values: this.districtDef as unknown as Record<string, number>, file: 'world/bairro.json',
@@ -175,77 +173,50 @@ export class Game {
     const g = this.district.grid;
     const cx = 0, z = g.origin.z + g.sz * 0.5 + 12, y = this.terrain.groundHeight(cx, z);
     const rig = buildDummyRig(this.dummyDef);
-    const dark = hexToRgb('#2a2d33'), seatC = hexToRgb('#3d4148'), steel = hexToRgb('#7c838a');
-    const seats: Record<string, number> = {};
-    const order = ['tpose', 'standing', 'car', 'bike'];
-    order.forEach((name, i) => {
-      const pose = this.dummyDef.poses[name];
-      if (!pose) return;
-      const x = cx + [-5.5, -2.8, 1.2, 5.6][i];
-      if (name === 'car' || name === 'bike') {
-        // O veículo de verdade, estacionado e virado para +Z.
-        const parked = name === 'car' ? this.makeCar() : this.makeBike();
-        parked.update(x, y, z, Math.PI, 0, 0, 0, 0);
-        this.showcase.add(parked.group);
-        this.showcaseSpots[name] = [x, y, z];
-        return;
-      }
-      const seatY = seats[name] ?? 0;
-      const view = new DummyView(rig, this.mat);
-      view.setPose(pose);
-      view.mesh.position.set(x, y + seatY, z);
-      view.mesh.rotation.y = Math.PI;
-      this.showcase.add(view.mesh);
+    // Da esquerda para a direita: T, em pé, carro, três momentos da transformação e a moto.
+    const row: [string, number][] = [['tpose', -9.5], ['standing', -7], ['car', -3.5], ['morph25', 1], ['morph50', 5], ['morph75', 9], ['bike', 13]];
+    for (const [name, dx] of row) {
+      const x = cx + dx;
       this.showcaseSpots[name] = [x, y, z];
-      if (!seatY) return;
-      // Assento provisório (no espaço do personagem: frente em −Z).
-      const b = new MeshBuilder();
-      {
-        b.push().translate(0, -0.08, 0.05).box(0.26, 0.1, 0.6, seatC).pop();
-        b.push().translate(0, 0.0, -0.45).box(0.3, 0.22, 0.45, steel).pop();
-        b.push().translate(0, 0.35, -0.72).box(0.7, 0.04, 0.04, dark).pop();
-        b.push().translate(0, -0.45, -0.1).box(0.2, 0.6, 0.8, dark).pop();
-        for (const sx of [-0.2, 0.2]) b.push().translate(sx, -0.62, 0.2).box(0.18, 0.03, 0.08, steel).pop();
+      if (name === 'tpose' || name === 'standing') {
+        const view = new DummyView(rig, this.mat);
+        view.setPose(this.dummyDef.poses[name]);
+        view.mesh.position.set(x, y, z);
+        view.mesh.rotation.y = Math.PI;
+        this.showcase.add(view.mesh);
+        continue;
       }
-      const prop = new THREE.Mesh(toGeometry(b.build()), this.mat);
-      prop.position.copy(view.mesh.position);
-      prop.rotation.y = Math.PI;
-      this.showcase.add(prop);
-    });
+      const v = this.makeVehicle();
+      const t = name === 'car' ? 0 : name === 'bike' ? 1 : Number(name.slice(5)) / 100;
+      v.setMorph('car', 'bike', t);
+      v.update(x, y, z, Math.PI, 0, 0, 0, 0);
+      this.showcase.add(v.group);
+    }
   }
 
-  private makeCar(): CarView {
-    return new CarView(buildCarModel(this.dummyDef.colors), buildDummyRig(this.dummyDef), this.dummyDef.poses.car, this.mat);
+  private makeVehicle(): VehicleView {
+    const c = this.dummyDef.colors;
+    return new VehicleView(buildCarShape(c), buildBikeShape(c), buildDummyRig(this.dummyDef),
+      { car: this.dummyDef.poses.car, bike: this.dummyDef.poses.bike }, this.mat, { tire: c.dark, hub: c.accent });
   }
 
-  private makeBike(): CarView {
-    return new CarView(buildBikeModel(this.dummyDef.colors), buildDummyRig(this.dummyDef), this.dummyDef.poses.bike, this.mat);
-  }
-
-  /** Mudou o Dummy no editor: refaz a vitrine e os veículos do jogador. */
+  /** Mudou o Dummy no editor: refaz a vitrine e o veículo do jogador. */
   private rebuildDummies(): void {
     this.buildShowcase();
-    this.scene.remove(this.car.group, this.bike.group);
-    this.car = this.makeCar();
-    this.bike = this.makeBike();
-    this.scene.add(this.car.group, this.bike.group);
-    this.setForm(this.form);
+    this.scene.remove(this.vehicle.group);
+    this.vehicle = this.makeVehicle();
+    this.scene.add(this.vehicle.group);
   }
 
-  private get activeParams() { return this.form === 'car' ? this.params : this.bikeParams; }
+  private get formParams(): Record<Form, typeof this.params> { return { car: this.params, bike: this.bikeParams }; }
 
-  /** Troca de forma mantendo posição, rumo e velocidade; recusa se a nova carroceria não couber. */
-  setForm(f: Form): boolean {
-    const p = f === 'car' ? this.params : this.bikeParams;
-    if (f !== this.form && !fitsAt(this.state, p, this.world)) return false;
-    this.form = f;
-    this.car.group.visible = f === 'car';
-    this.bike.group.visible = f === 'bike';
-    return true;
+  /** Começa a transformação para a outra forma (recusa se não couber ou se já estiver transformando). */
+  transform(to?: Form): boolean {
+    return startMorph(this.state, to ?? (this.state.form === 'car' ? 'bike' : 'car'), this.formParams, this.world);
   }
 
   private respawn(): void {
-    this.state = createCar(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading);
+    this.state = createVehicle(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading, this.state.form);
     this.prev = structuredClone(this.state);
     this.camYaw = this.state.heading;
   }
@@ -275,7 +246,7 @@ export class Game {
   /** Um passo fixo da simulação. */
   private step(inp: CarInput): void {
     this.prev = structuredClone(this.state);
-    const ev = stepCar(this.state, inp, this.activeParams, this.world, STEP);
+    const ev = stepVehicle(this.state, inp, this.formParams, this.morphParams, this.world, STEP);
     this.simTime += STEP;
     if (ev.some((e) => e.type === 'water') || this.state.pos.y < -60) this.respawn();
   }
@@ -288,7 +259,7 @@ export class Game {
       if (this.input.confirmPressed()) { this.screen = 'playing'; this.titleEl.hidden = true; this.hudEl.hidden = false; }
       return;
     }
-    if (this.input.formPressed()) this.setForm(this.form === 'car' ? 'bike' : 'car');
+    if (this.input.formPressed()) this.transform();
     this.lastInput = this.input.read();
     this.acc += dt;
     while (this.acc >= STEP) { this.step(this.lastInput); this.acc -= STEP; }
@@ -298,7 +269,8 @@ export class Game {
     const a = this.acc / STEP, s = this.state, p = this.prev;
     const L = (u: number, v: number) => u + (v - u) * a;
     const x = L(p.pos.x, s.pos.x), y = L(p.pos.y, s.pos.y), z = L(p.pos.z, s.pos.z), h = L(p.heading, s.heading);
-    const view = this.form === 'car' ? this.car : this.bike;
+    const view = this.vehicle;
+    view.setMorph(s.morphFrom, s.form, L(p.morphT, s.morphT));
     view.update(x, y, z, h, L(p.pitch, s.pitch), L(p.roll, s.roll) + L(p.lean, s.lean), L(p.wheelSpin, s.wheelSpin), L(p.steerVis, s.steerVis));
     if (this.debugCam) {
       const c = this.debugCam;
@@ -328,13 +300,18 @@ export class Game {
     let triangles = 0;
     for (const m of this.districtMeshes) triangles += m.geometry.getAttribute('position').count / 3;
     return {
-      ready: this.ready, screen: this.screen, simTime: this.simTime, form: this.form, lean: this.state.lean, pos: { ...this.state.pos }, heading: this.state.heading, speed: forwardSpeed(this.state), onGround: this.state.onGround, wallHits: this.state.wallHits, editorOpen: this.editor.open,
+      ready: this.ready, screen: this.screen, simTime: this.simTime, form: this.state.form, physForm: this.state.physForm, morphT: this.state.morphT, lean: this.state.lean, pos: { ...this.state.pos }, heading: this.state.heading, speed: forwardSpeed(this.state), onGround: this.state.onGround, wallHits: this.state.wallHits, editorOpen: this.editor.open,
       showcase: this.showcaseSpots,
       district: { buildings: this.district.buildings.length, sites: this.district.sites.length, viaducts: this.district.viaducts.length, meshes: this.districtMeshes.length, triangles },
     };
   }
   debugCamera(c: DebugCamera | null): void { this.debugCam = c; }
-  debugSetForm(f: Form): boolean { return this.setForm(f); }
+  /** Transforma e, se `instant`, completa a transformação na hora. */
+  debugSetForm(f: Form, instant = true): boolean {
+    const ok = this.transform(f);
+    if (ok && instant) { this.state.morphT = 1; this.state.physForm = f; this.prev = structuredClone(this.state); }
+    return ok;
+  }
   /** Avança a simulação sem renderizar, com a última entrada (ou a dada). */
   debugAdvance(seconds: number, inp?: Partial<CarInput>): void {
     const i = { ...this.lastInput, ...inp };

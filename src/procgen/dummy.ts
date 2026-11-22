@@ -236,3 +236,14 @@ export function jointPosition(rig: Rig, pose: DummyPose, joint: Joint): V {
   const m = poseMatrices(rig, pose).get(joint)!;
   return [m[3], m[7], m[11]];
 }
+
+/** Pose intermediária (transformação): interpola `rootY` e cada junta, grau a grau. */
+export function lerpPose(a: DummyPose, b: DummyPose, t: number): DummyPose {
+  const joints: DummyPose['joints'] = {};
+  for (const j of JOINTS) {
+    const ea = a.joints[j] ?? [0, 0, 0], eb = b.joints[j] ?? [0, 0, 0];
+    if (!a.joints[j] && !b.joints[j]) continue;
+    joints[j] = [ea[0] + (eb[0] - ea[0]) * t, ea[1] + (eb[1] - ea[1]) * t, ea[2] + (eb[2] - ea[2]) * t];
+  }
+  return { label: t < 0.5 ? a.label : b.label, rootY: a.rootY + (b.rootY - a.rootY) * t, joints };
+}
