@@ -76,8 +76,10 @@ await btn(1, 0);
 await page.evaluate(() => window.game.debugRespawn());
 const s2 = await st();
 await btn(3, 1);
+const fy = await page.evaluate(() => window.game.frames);
+await waitFor((f) => window.game.frames >= f + 1, fy); // segura 1 quadro (toque rápido)
+await btn(3, 0); // toque rápido no Y: próxima forma
 await waitFor(() => window.game.debugState().form === 'bike');
-await btn(3, 0);
 await waitFor(() => window.game.debugState().morphT >= 0.4);
 await shot('02c-transformando.png');
 await waitFor(() => window.game.debugState().morphT >= 1 && window.game.debugState().physForm === 'bike');
@@ -102,6 +104,18 @@ await waitFor(() => window.game.debugState().combat.projectiles === 0 && window.
 const c1 = (await st()).combat, d1 = (await st()).district;
 console.log('combate:', JSON.stringify({ shots: c1.shots, blasts: c1.blasts, voxels: c1.voxelsRemoved, debris: c1.debris, remeshed: d1.remeshed }));
 await assert(c1.voxelsRemoved > 50 && d1.remeshed > 0, 'os tiros deveriam arrancar voxels e refazer a malha');
+// Roda de formas (M1.2): segurar Y abre a roda; analógico direito para cima escolhe CARRO
+await page.evaluate(() => { window.game.debugRespawn(); window.game.debugSetForm('bike'); });
+await btn(3, 1);
+await waitFor(() => window.game.debugState().wheelOpen);
+await axis(3, -1);
+const fw = await page.evaluate(() => window.game.frames);
+await waitFor((f) => window.game.frames >= f + 3, fw);
+await shot('15-roda-de-formas.png');
+await btn(3, 0);
+await axis(3, 0);
+await waitFor(() => !window.game.debugState().wheelOpen && window.game.debugState().form === 'car');
+
 // Partida (M0.7): o bot anda, o HUD aparece e um alvo cai com tiros
 const m0 = (await st()).match;
 await assert(m0.bots.length === 1 && m0.targets.length === 8, 'a partida deveria ter 1 bot e 8 alvos');
@@ -198,8 +212,8 @@ await mp.mouse.up();
 const formBtn = await mp.locator('.touch-btn.form').boundingBox();
 await mp.mouse.move(formBtn.x + 30, formBtn.y + 30);
 await mp.mouse.down();
+await mp.mouse.up(); // toque rápido no FORMA: próxima forma
 await mp.waitForFunction(() => window.game.debugState().form === 'bike');
-await mp.mouse.up();
 // Desempenho no perfil celular (SwiftShader, sem GPU: os números só servem de comparação).
 const mdc = await mp.evaluate(async () => {
   const g = window.game, r = g.renderer;

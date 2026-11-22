@@ -11,21 +11,25 @@ import { DummyView } from './dummy-view';
 const toLinear = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
 
 /**
- * Vista do veículo que se transforma (ADR 0008): a carcaça é uma malha só (1 draw call) com as
- * peças transformadas na CPU; as rodas são instanciadas (1) e o Dummy é outra malha (1).
+ * Vista do veículo que se transforma (ADR 0008 e 0012): a carcaça é uma malha só (1 draw call) com
+ * as peças transformadas na CPU; as rodas são instanciadas (1) e o Dummy é outra malha (1).
+ * Serve para qualquer par de formas: os pares de peças de cada (de → para) são calculados uma vez.
  * `setMorph` recalcula só quando o progresso muda; parado, não custa nada por quadro.
  */
 export class VehicleView {
   readonly group = new THREE.Group();
-  private pairs: PiecePair[];
-  private units: UnitGeometry[];
-  private pos: THREE.BufferAttribute;
-  private col: THREE.BufferAttribute;
-  private glow: THREE.BufferAttribute;
+  private body: THREE.Mesh;
+  private pairsCache = new Map<string, { pairs: PiecePair[]; units: UnitGeometry[]; verts: number }>();
+  private pos!: THREE.BufferAttribute;
+  private col!: THREE.BufferAttribute;
+  private glow!: THREE.BufferAttribute;
+  private capacity = 0;
   private wheels: THREE.InstancedMesh;
-  private u = -1;
+  private key = '';
   private wheelNow: { pos: number[]; radius: number; width: number }[] = [];
   private steerWheels = 2;
+  /** Onde a torre do canhão encaixa agora (desliza junto na transformação). */
+  readonly turretMount = new THREE.Vector3();
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -33,22 +37,11 @@ export class VehicleView {
   private sc = new THREE.Vector3();
   readonly dummy: DummyView;
 
-  /** `car` e `bike` são as formas; a transformação vai de uma à outra (u = 0 carro, 1 moto). */
-  constructor(readonly car: VehicleShape, readonly bike: VehicleShape, rig: Rig, private poses: Record<Form, DummyPose>, material: THREE.Material, wheelColors: { tire: string; hub: string }) {
+  constructor(readonly shapes: Record<Form, VehicleShape>, rig: Rig, private poses: Record<Form, DummyPose>, material: THREE.Material, wheelColors: { tire: string; hub: string }) {
     this.group.rotation.order = 'YXZ';
-    this.pairs = pairPieces(car.pieces, bike.pieces);
-    this.units = this.pairs.map((p) => (p.a.kind === 'cyl' ? UNIT_CYL : UNIT_BOX));
-    const n = this.units.reduce((s, g) => s + g.positions.length / 3, 0);
-    const g = new THREE.BufferGeometry();
-    this.pos = new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage);
-    this.col = new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage);
-    this.glow = new THREE.BufferAttribute(new Float32Array(n), 1).setUsage(THREE.DynamicDrawUsage);
-    g.setAttribute('position', this.pos);
-    g.setAttribute('color', this.col);
-    g.setAttribute('glow', this.glow);
-    const body = new THREE.Mesh(g, material);
-    body.name = 'carcaca';
-    body.frustumCulled = false;
+    this.body = new THREE.Mesh(new THREE.BufferGeometry(), material);
+    this.body.name = 'carcaca';
+    this.body.frustumCulled = false;
 
     const wg = new THREE.BufferGeometry();
     const tire = hexToRgb(wheelColors.tire).map(toLinear), hub = hexToRgb(wheelColors.hub).map(toLinear);
@@ -61,46 +54,76 @@ export class VehicleView {
     this.wheels.frustumCulled = false;
 
     this.dummy = new DummyView(rig, material);
-    this.group.add(body, this.wheels, this.dummy.mesh);
-    this.setMorph('car', 'car', 1);
+    this.group.add(this.body, this.wheels, this.dummy.mesh);
+    const first = Object.keys(shapes)[0] as Form;
+    this.setMorph(first, first, 1);
   }
 
-  /** Progresso da transformação de `from` para `to` (t de 0 a 1). */
+  private pairsFor(from: Form, to: Form) {
+    const k = `${from}>${to}`;
+    let c = this.pairsCache.get(k);
+    if (!c) {
+      const pairs = pairPieces(this.shapes[from].pieces, this.shapes[to].pieces);
+      const units = pairs.map((p) => (p.a.kind === 'cyl' ? UNIT_CYL : UNIT_BOX));
+      c = { pairs, units, verts: units.reduce((s, g) => s + g.positions.length / 3, 0) };
+      this.pairsCache.set(k, c);
+    }
+    return c;
+  }
+
+  /** Garante buffers do tamanho certo para o par atual (cresce quando precisa). */
+  private ensure(verts: number): void {
+    if (verts <= this.capacity && this.body.geometry.getAttribute('position')) {
+      this.body.geometry.setDrawRange(0, verts);
+      return;
+    }
+    this.capacity = Math.max(verts, this.capacity);
+    const g = new THREE.BufferGeometry();
+    this.pos = new THREE.BufferAttribute(new Float32Array(this.capacity * 3), 3).setUsage(THREE.DynamicDrawUsage);
+    this.col = new THREE.BufferAttribute(new Float32Array(this.capacity * 3), 3).setUsage(THREE.DynamicDrawUsage);
+    this.glow = new THREE.BufferAttribute(new Float32Array(this.capacity), 1).setUsage(THREE.DynamicDrawUsage);
+    g.setAttribute('position', this.pos);
+    g.setAttribute('color', this.col);
+    g.setAttribute('glow', this.glow);
+    g.setDrawRange(0, verts);
+    this.body.geometry.dispose();
+    this.body.geometry = g;
+  }
+
+  /** Progresso da transformação de `from` para `to` (t de 0 a 1). Parado: from = to. */
   setMorph(from: Form, to: Form, t: number): void {
-    const u = from === to ? (to === 'car' ? 0 : 1) : to === 'bike' ? t : 1 - t;
-    if (u === this.u) return;
-    this.u = u;
-    // Carcaça
+    const tt = from === to ? 1 : t;
+    const key = `${from}>${to}:${tt}`;
+    if (key === this.key) return;
+    this.key = key;
+    const { pairs, units, verts } = this.pairsFor(from, to);
+    this.ensure(verts);
     const P = this.pos.array as Float32Array, Cc = this.col.array as Float32Array, Gl = this.glow.array as Float32Array;
     let o = 0;
-    this.pairs.forEach((pr, i) => {
-      const pc = morphPiece(pr, u), unit = this.units[i];
-      this.writePiece(pc, unit, P, Cc, Gl, o);
-      o += unit.positions.length / 3;
+    pairs.forEach((pr, i) => {
+      this.writePiece(morphPiece(pr, tt), units[i], P, Cc, Gl, o);
+      o += units[i].positions.length / 3;
     });
     this.pos.needsUpdate = this.col.needsUpdate = this.glow.needsUpdate = true;
-    this.body().geometry.computeVertexNormals();
-    // Rodas, assento e pose do Dummy
-    this.wheelNow = this.car.wheels.map((w, i) => {
-      const r = morphWheel(w, this.bike.wheels[i], u);
+    this.body.geometry.computeVertexNormals();
+    // Rodas, assento, torre e pose do Dummy
+    const A = this.shapes[from], B = this.shapes[to], e = ease(tt);
+    this.wheelNow = A.wheels.map((w, i) => {
+      const r = morphWheel(w, B.wheels[i], tt);
       return { pos: r.pos, radius: r.radius, width: r.width };
     });
-    this.steerWheels = u < 0.5 ? this.car.steerWheels : this.bike.steerWheels;
-    const e = ease(u);
-    const seat = this.car.seat.map((c, k) => c + (this.bike.seat[k] - c) * e);
-    this.dummy.mesh.position.set(seat[0], seat[1], seat[2]);
-    this.dummy.setPose(lerpPose(this.poses.car, this.poses.bike, e));
+    this.steerWheels = tt < 0.5 ? A.steerWheels : B.steerWheels;
+    const L = (a: number[], b: number[], k: number) => a[k] + (b[k] - a[k]) * e;
+    this.dummy.mesh.position.set(L(A.seat, B.seat, 0), L(A.seat, B.seat, 1), L(A.seat, B.seat, 2));
+    this.turretMount.set(L(A.turret, B.turret, 0), L(A.turret, B.turret, 1), L(A.turret, B.turret, 2));
+    this.dummy.setPose(lerpPose(this.poses[from], this.poses[to], e));
   }
-
-  private body(): THREE.Mesh { return this.group.children[0] as THREE.Mesh; }
 
   private writePiece(p: Piece, g: UnitGeometry, P: Float32Array, C: Float32Array, Gl: Float32Array, start: number): void {
     // M = T · Rx · Rz · Ry · S
     const [rx, ry, rz] = p.rot, [sx, sy, sz] = p.size;
     const cx = Math.cos(rx), sxn = Math.sin(rx), cz = Math.cos(rz), szn = Math.sin(rz), cy = Math.cos(ry), syn = Math.sin(ry);
-    // Rx·Rz
     const a = [cz, -szn, 0, cx * szn, cx * cz, -sxn, sxn * szn, sxn * cz, cx];
-    // (Rx·Rz)·Ry
     const r = [
       a[0] * cy - a[2] * syn, a[1], a[0] * syn + a[2] * cy,
       a[3] * cy - a[5] * syn, a[4], a[3] * syn + a[5] * cy,

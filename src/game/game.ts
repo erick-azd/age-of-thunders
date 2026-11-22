@@ -18,6 +18,7 @@ import { Terrain, WorldSchema } from '../procgen/terrain';
 import { buildBikeShape, buildCarShape } from '../procgen/vehicle-shape';
 import { DistrictView } from '../render/district-view';
 import { DummyView } from '../render/dummy-view';
+import { FormWheel, WHEEL_FORMS, sectorOf } from '../render/form-wheel';
 import { Bolts, Debris, Flashes, Turret } from '../render/fx';
 import { Hud } from '../render/hud';
 import { flatMaterial, toGeometry } from '../render/mesh-utils';
@@ -29,7 +30,7 @@ import { type StreetNav, buildStreetNav } from '../sim/bot';
 import { CAR_SPECS, type CarInput, CarParamsSchema, forwardSpeed, neutralCarInput } from '../sim/car';
 import { COMBAT_SPECS, CombatSchema, type MatchEvent, type MatchState, createMatch, stepMatch } from '../sim/match';
 import { type Vec3, v3 } from '../sim/math';
-import { type Form, MORPH_SPECS, MorphSchema, type VehicleState, createVehicle, startMorph } from '../sim/vehicle';
+import { FORMS, type Form, MORPH_SPECS, MorphSchema, type VehicleState, createVehicle, startMorph } from '../sim/vehicle';
 import { VOXEL } from '../sim/voxels';
 import { WEAPON_SPECS, WeaponSchema, fire, raycast } from '../sim/weapons';
 
@@ -73,6 +74,12 @@ export class Game {
   private input = new Input(window);
   private lastInput: CarInput = neutralCarInput();
   private pendingMorph: Form | null = null;
+  /** Roda de formas: tempo segurando o botão, vetor de escolha (mouse) e se abriu pelo toque. */
+  private wheel!: FormWheel;
+  private formWasHeld = false;
+  private formHoldT = 0;
+  private wheelVec = { x: 0, y: 0 };
+  private wheelByTouch = false;
   private camYaw = 0;
   private renderDt = 0;
   /** Mira: desvio de rumo da câmera em relação ao veículo e inclinação (radianos). */
@@ -170,6 +177,7 @@ export class Game {
     this.titleEl.innerHTML = '<h1>Age of Thunders</h1><p>A / Enter para começar · F1 abre o editor</p>';
     ui.append(this.titleEl);
     this.hud = new Hud(ui);
+    this.wheel = new FormWheel(ui, (f) => { this.pickForm(f); });
     if (pr.touch) {
       this.input.touch = new TouchControls(ui);
       document.body.classList.add('touch-on');
@@ -221,7 +229,7 @@ export class Game {
 
   private makeVehicle(colors: DummyDef['colors']): VehicleView {
     const rig = buildDummyRig({ ...this.dummyDef, colors });
-    return new VehicleView(buildCarShape(colors), buildBikeShape(colors), rig,
+    return new VehicleView({ car: buildCarShape(colors), bike: buildBikeShape(colors) }, rig,
       { car: this.dummyDef.poses.car, bike: this.dummyDef.poses.bike }, this.mat, { tire: colors.dark, hub: colors.accent });
   }
 
@@ -272,9 +280,57 @@ export class Game {
   private get formParams() { return { car: this.params, bike: this.bikeParams }; }
   private get matchParams() { return { cars: this.formParams, morph: this.morphParams, weapon: this.weapon, combat: this.combat }; }
 
-  /** Pede a transformação para a outra forma (vale no próximo passo). */
+  /** Pede a transformação (vale no próximo passo). Sem destino: a próxima forma da lista. */
   transform(to?: Form): void {
-    this.pendingMorph = to ?? (this.state.form === 'car' ? 'bike' : 'car');
+    const i = FORMS.indexOf(this.state.form);
+    this.pendingMorph = to ?? FORMS[(i + 1) % FORMS.length];
+  }
+
+  /** Escolha na roda (ou tecla 1–4): só formas que existem e diferentes da atual. */
+  private pickForm(f: string): void {
+    this.wheel.hide();
+    this.wheelByTouch = false;
+    if ((FORMS as readonly string[]).includes(f) && f !== this.state.form) this.transform(f as Form);
+  }
+
+  /**
+   * Botão de forma: toque rápido troca para a próxima; segurado por 0,25 s abre a roda.
+   * Controle e mouse escolhem pela direção e confirmam ao soltar; no toque a roda fica aberta até
+   * tocar num setor (ou tocar de novo no FORMA para fechar).
+   */
+  private updateFormWheel(dt: number, aim: { mouseX: number; mouseY: number; stickX: number; stickY: number }): boolean {
+    const held = this.input.formHeld(), touchDown = !!this.input.touch?.formDown;
+    if (held && !this.formWasHeld) {
+      this.formHoldT = 0;
+      this.wheelVec = { x: 0, y: 0 };
+      if (this.wheel.open && this.wheelByTouch) { this.wheel.hide(); this.wheelByTouch = false; this.formWasHeld = held; return true; }
+    }
+    if (held) {
+      this.formHoldT += dt;
+      if (this.formHoldT > 0.25 && !this.wheel.open) { this.wheel.show(this.state.form, FORMS); this.wheelByTouch = touchDown; }
+    }
+    if (this.wheel.open && !this.wheelByTouch) {
+      // Direção: analógico direito (absoluto) ou mouse (acumulado).
+      this.wheelVec.x = Math.max(-1, Math.min(1, this.wheelVec.x + aim.mouseX * 0.01));
+      this.wheelVec.y = Math.max(-1, Math.min(1, this.wheelVec.y + aim.mouseY * 0.01));
+      const sx = Math.hypot(aim.stickX, aim.stickY) > 0.5 ? aim.stickX : this.wheelVec.x;
+      const sy = Math.hypot(aim.stickX, aim.stickY) > 0.5 ? aim.stickY : this.wheelVec.y;
+      // Guarda a última direção escolhida: soltar o analógico junto com o botão não perde a escolha.
+      const sec = sectorOf(sx, sy);
+      if (sec >= 0) this.wheel.highlight(sec);
+    }
+    if (!held && this.formWasHeld) {
+      if (!this.wheel.open) this.transform();
+      else if (!this.wheelByTouch) {
+        const sel = this.wheel.selected;
+        this.wheel.hide();
+        if (sel >= 0) this.pickForm(WHEEL_FORMS[sel]);
+      }
+    }
+    this.formWasHeld = held;
+    const d = this.input.digitPressed();
+    if (d >= 0) this.pickForm(WHEEL_FORMS[d]);
+    return this.wheel.open;
   }
 
   private resize(): void {
@@ -304,7 +360,7 @@ export class Game {
     this.match.fighters.forEach((f, i) => { if (this.riders[i]) this.riders[i].prev = structuredClone(f.veh); });
     const ev = stepMatch(this.match, { input: inp, fire: this.firing, aim: this.aimPoint, muzzle: this.muzzle, morph: this.pendingMorph },
       this.matchParams, this.world, this.district.grid, this.nav, this.spawn, STEP);
-    this.pendingMorph = null;
+    if (this.match.fighters[0].respawnT <= 0) this.pendingMorph = null; // destruído: o pedido espera a volta
     this.simTime += STEP;
     this.onEvents(ev);
   }
@@ -361,10 +417,11 @@ export class Game {
       if (this.input.confirmPressed()) { this.screen = 'playing'; this.titleEl.hidden = true; }
       return;
     }
-    if (this.input.formPressed()) this.transform();
     this.lastInput = this.input.read();
     // Mira: mouse (preso) e analógico direito giram a câmera; parada por 2 s, volta para a frente.
+    // Com a roda de formas aberta, eles escolhem a forma (a câmera fica parada).
     const aim = this.input.readAim();
+    if (this.updateFormWheel(dt, aim)) { aim.mouseX = aim.mouseY = aim.stickX = aim.stickY = 0; }
     const turn = aim.mouseX * 0.0025 + aim.stickX * 2.4 * dt, tilt = -aim.mouseY * 0.0022 - aim.stickY * 1.6 * dt;
     if (turn || tilt) this.aimIdle = 0; else this.aimIdle += dt;
     this.aimYaw = Math.atan2(Math.sin(this.aimYaw + turn), Math.cos(this.aimYaw + turn));
@@ -389,9 +446,8 @@ export class Game {
       const mt = L(p.morphT, s.morphT);
       r.view.setMorph(s.morphFrom, s.form, mt);
       r.view.update(x, y, z, h, L(p.pitch, s.pitch), L(p.roll, s.roll) + L(p.lean, s.lean), L(p.wheelSpin, s.wheelSpin), L(p.steerVis, s.steerVis));
-      // Torre: no alto do santantônio (carro) ou na rabeta (moto), deslizando junto na transformação.
-      const u = s.form === s.morphFrom ? (s.form === 'car' ? 0 : 1) : s.form === 'bike' ? mt : 1 - mt;
-      r.turret.group.position.set(0, 1.92 + (1.05 - 1.92) * u, 0.95 + (0.66 - 0.95) * u);
+      // Torre: no encaixe da forma (santantônio do carro, rabeta da moto), deslizando na transformação.
+      r.turret.group.position.copy(r.view.turretMount);
       if (i === 0) { px = x; py = y; pz = z; ph = h; }
     });
 
@@ -461,7 +517,7 @@ export class Game {
   debugState() {
     const s = this.state, f = this.match.fighters;
     return {
-      ready: this.ready, screen: this.screen, profile: this.profile.name, touch: this.profile.touch, fps: this.fps, frameMs: this.frameMs, simTime: this.simTime, form: s.form, physForm: s.physForm, morphT: s.morphT, lean: s.lean,
+      ready: this.ready, screen: this.screen, profile: this.profile.name, touch: this.profile.touch, fps: this.fps, frameMs: this.frameMs, simTime: this.simTime, wheelOpen: this.wheel.open, form: s.form, physForm: s.physForm, morphT: s.morphT, lean: s.lean,
       pos: { ...s.pos }, heading: s.heading, speed: forwardSpeed(s), onGround: s.onGround, wallHits: s.wallHits, editorOpen: this.editor.open,
       showcase: this.showcaseSpots,
       tower: this.towerCenter(),
@@ -478,9 +534,11 @@ export class Game {
     };
   }
   debugCamera(c: DebugCamera | null): void { this.debugCam = c; }
-  /** Volta ao ponto de partida (smoke e ferramentas). */
+  /** Volta ao ponto de partida, com a vida cheia (smoke e ferramentas). */
   debugRespawn(): void {
     const f = this.match.fighters[0];
+    f.respawnT = 0;
+    f.hp = f.maxHp;
     f.veh = createVehicle(this.spawn.pos, this.spawn.heading, f.veh.form);
     this.riders[0].prev = structuredClone(f.veh);
     this.camYaw = this.spawn.heading;

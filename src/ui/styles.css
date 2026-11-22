@@ -83,3 +83,18 @@ body.touch-on .hud-score { right: 16px; top: 64px; bottom: auto; }
   .touch-btn.drift { font-size: 10px; letter-spacing: 0; }
   .hud-banner { font-size: 20px; }
 }
+
+/* Roda de formas (M1.2, ADR 0012). */
+.form-wheel { position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -150px 0 0 -150px; pointer-events: none; }
+.fw-hub { position: absolute; left: 50%; top: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.6); background: rgba(10, 14, 30, 0.6); }
+.fw-slot { position: absolute; width: 108px; height: 70px; pointer-events: auto; border: 3px solid rgba(255, 255, 255, 0.8); border-radius: 10px;
+  background: rgba(10, 14, 30, 0.75); color: #fff; font: 900 16px/1.1 monospace; letter-spacing: 1px; text-shadow: 0 2px 0 #000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.fw-slot span { font: 700 11px/1 monospace; color: #9fb4ff; }
+.fw-slot.s0 { left: 96px; top: 0; }
+.fw-slot.s1 { right: 0; top: 115px; }
+.fw-slot.s2 { left: 96px; bottom: 0; }
+.fw-slot.s3 { left: 0; top: 115px; }
+.fw-slot.current { border-color: #3dffb0; }
+.fw-slot.sel { background: rgba(61, 255, 176, 0.55); transform: scale(1.08); }
+.fw-slot:disabled { opacity: 0.35; }

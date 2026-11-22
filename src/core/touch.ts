@@ -13,7 +13,10 @@ export class TouchControls {
   brake = 0;
   handbrake = false;
   fire = false;
-  private formEdge = false;
+  /** O botão FORMA está apertado agora. */
+  formDown = false;
+  /** Apertou o FORMA desde a última leitura (um toque muito rápido não se perde entre dois quadros). */
+  formPulse = false;
   private tapEdge = false;
   private aimDX = 0;
   private aimDY = 0;
@@ -32,7 +35,7 @@ export class TouchControls {
     this.aim(q('.touch-aim'));
     this.hold(q('.fire'), (v) => { this.fire = v; });
     this.hold(q('.drift'), (v) => { this.handbrake = v; });
-    this.hold(q('.form'), (v) => { if (v) this.formEdge = true; });
+    this.hold(q('.form'), (v) => { this.formDown = v; if (v) this.formPulse = true; });
     // Qualquer toque conta como "começar" na tela de título.
     this.el.addEventListener('pointerdown', () => { this.tapEdge = true; });
   }
@@ -86,7 +89,6 @@ export class TouchControls {
   /** Toque fora dos controles (na tela de jogo): conta como "começar" no título. */
   tap(): void { this.tapEdge = true; }
 
-  consumeForm(): boolean { const v = this.formEdge; this.formEdge = false; return v; }
   consumeTap(): boolean { const v = this.tapEdge; this.tapEdge = false; return v; }
   consumeAim(): { dx: number; dy: number } { const v = { dx: this.aimDX, dy: this.aimDY }; this.aimDX = this.aimDY = 0; return v; }
 }

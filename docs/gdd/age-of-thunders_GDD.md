@@ -53,7 +53,7 @@ Verbos do jogador:
 | Freio de mão (derrapar) | B | Espaço | Botão DERRAPAR |
 | Câmera / mira | Analógico direito | Mouse (clique no jogo para prender; Esc solta) | Arrastar na metade direita |
 | Atirar | RT (ou RB) | Clique esquerdo ou F | Botão TIRO |
-| Transformar | Y (no futuro, segurar abre a roda de formas) | Tab ou Q | Botão FORMA |
+| Transformar | Y: toque rápido troca; segurar abre a roda e o analógico direito escolhe | Tab ou Q (idem, com o mouse); teclas 1 a 4 | FORMA: toque rápido troca; segurar abre a roda |
 | Começar | A | Enter | Tocar na tela |
 | Editor | — | F1 | — |
 | Medidor de FPS | — | F3 | ligado no perfil celular |
@@ -92,7 +92,9 @@ Escala futura: mapas grandes como as ilhas do Polygonizer, com espaço para as a
 
 **Estilo arcade (pronto na M0.7):** barras inclinadas de vida no topo (VOCÊ em verde-ciano à esquerda, INIMIGO em laranja à direita), cronômetro grande no meio, forma e velocidade embaixo à esquerda, abates, derrotas e alvos embaixo à direita, mira circular no centro que pisca ao acertar, faixa "DESTRUÍDO" ao cair. Números em fonte monoespaçada e cores fortes.
 
-A fazer: munição, minimapa e a roda de formas (ao segurar o botão de transformar).
+**Roda de formas (M1.2):** CARRO em cima, MOTO à direita, HOVER embaixo, TANQUE à esquerda; formas que ainda não existem aparecem apagadas.
+
+A fazer: contador de munição e minimapa.
 
 ## 10. Áudio
 

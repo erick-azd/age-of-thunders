@@ -12,7 +12,6 @@ import type { TouchControls } from './touch';
 export class Input {
   private keys = new Set<string>();
   private prevA = false;
-  private prevForm = false;
   private mouseDX = 0;
   private mouseDY = 0;
   private mouseFire = false;
@@ -71,14 +70,6 @@ export class Input {
     return (this.touch?.consumeTap() ?? false) || edge;
   }
 
-  /** Troca de forma (Tab ou Y) acabou de ser apertada. */
-  formPressed(): boolean {
-    const now = this.keys.has('Tab') || this.keys.has('KeyQ') || !!this.pad()?.buttons[3]?.pressed;
-    const edge = now && !this.prevForm;
-    this.prevForm = now;
-    return (this.touch?.consumeForm() ?? false) || edge;
-  }
-
   /** Atirar (segurar): clique esquerdo com o mouse preso, F, RT (7) ou RB (5). */
   fireHeld(): boolean {
     const p = this.pad();
@@ -92,6 +83,23 @@ export class Input {
     const out = { mouseX: this.mouseDX + t.dx * 1.6, mouseY: this.mouseDY + t.dy * 1.6, stickX: dz(p?.axes[2] ?? 0), stickY: dz(p?.axes[3] ?? 0) };
     this.mouseDX = this.mouseDY = 0;
     return out;
+  }
+
+  /** Botão de forma apertado agora (Tab, Q, Y ou FORMA no toque): toque rápido troca, segurar abre a roda. */
+  formHeld(): boolean {
+    const t = this.touch, pulse = !!t?.formPulse;
+    if (t) t.formPulse = false;
+    return this.keys.has('Tab') || this.keys.has('KeyQ') || !!this.pad()?.buttons[3]?.pressed || !!t?.formDown || pulse;
+  }
+
+  /** Tecla de forma (1 a 4) acabou de ser apertada: devolve 0 a 3, ou −1. */
+  private prevDigit = -1;
+  digitPressed(): number {
+    let d = -1;
+    for (let i = 0; i < 4; i++) if (this.keys.has(`Digit${i + 1}`)) d = i;
+    const edge = d >= 0 && d !== this.prevDigit ? d : -1;
+    this.prevDigit = d;
+    return edge;
   }
 
   has(code: string): boolean { return this.keys.has(code); }

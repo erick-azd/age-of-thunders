@@ -6,6 +6,7 @@ import bikeJson from '../data/config/moto.json';
 import morphJson from '../data/config/transformacao.json';
 import { DummySchema, lerpPose } from '../src/procgen/dummy';
 import { buildBikeShape, buildCarShape, morphPiece, morphWheel, pairPieces } from '../src/procgen/vehicle-shape';
+import { sectorOf } from '../src/render/form-wheel';
 import { Arena } from '../src/sim/arena';
 import { CarParamsSchema, type CarInput, forwardSpeed } from '../src/sim/car';
 import { v3 } from '../src/sim/math';
@@ -83,4 +84,32 @@ test('dummy: a pose da transformação vai do carro à moto', () => {
   assert.deepEqual(lerpPose(d.poses.car, d.poses.bike, 1).joints.hipL, d.poses.bike.joints.hipL);
   const mid = lerpPose(d.poses.car, d.poses.bike, 0.5).joints.kneeL!;
   assert.ok(mid[0] < d.poses.car.joints.kneeL![0] && mid[0] > d.poses.bike.joints.kneeL![0]);
+});
+
+test('peças com nome: a mesma peça de papel vira a outra (frente vira frente)', () => {
+  const pal = DummySchema.parse(dummyJson).colors;
+  const car = buildCarShape(pal), bike = buildBikeShape(pal);
+  const pairs = pairPieces(car.pieces, bike.pieces);
+  const named = pairs.filter((p) => p.a.name && p.a.name === p.b.name);
+  for (const n of ['chassi', 'frente', 'capo', 'lateral-e', 'lateral-d', 'banco', 'comando', 'motor', 'traseira', 'luz-e', 'luz-d'])
+    assert.ok(named.some((p) => p.a.name === n), `a peça "${n}" deveria casar pelo nome`);
+  // Nomes não se repetem dentro de uma forma.
+  for (const s of [car, bike]) {
+    const names = s.pieces.map((p) => p.name).filter(Boolean);
+    assert.equal(new Set(names).size, names.length, 'nomes únicos');
+  }
+  // Ida e volta: bike → car também começa e termina certo.
+  const back = pairPieces(bike.pieces, car.pieces);
+  const vis = (t: number) => back.map((p) => morphPiece(p, t)).filter((p) => p.size[0] * p.size[1] * p.size[2] > 0).length;
+  assert.equal(vis(0), bike.pieces.length);
+  assert.equal(vis(1), car.pieces.length);
+});
+
+test('roda de formas: direção vira setor (cima carro, direita moto, baixo hover, esquerda tanque)', () => {
+  assert.equal(sectorOf(0, -1), 0);
+  assert.equal(sectorOf(1, 0), 1);
+  assert.equal(sectorOf(0, 1), 2);
+  assert.equal(sectorOf(-1, 0), 3);
+  assert.equal(sectorOf(0.1, 0.1), -1, 'centro não escolhe');
+  assert.equal(sectorOf(0.7, -0.6), 1, 'diagonal decide pelo lado mais forte');
 });
