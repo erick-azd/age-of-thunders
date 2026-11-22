@@ -48,11 +48,11 @@ Verbos do jogador:
 | Ação | Gamepad | Teclado/mouse | Toque |
 | --- | --- | --- | --- |
 | Direção | Analógico esquerdo | A/D ou ←/→ | Joystick à esquerda (para os lados) |
-| Acelerar | RT | W ou ↑ | Joystick para cima |
+| Acelerar | LT | W ou ↑ | Joystick para cima |
 | Freio / ré | A | S ou ↓ | Joystick para baixo |
 | Freio de mão (derrapar) | B | Espaço | Botão DERRAPAR |
 | Câmera / mira | Analógico direito | Mouse (clique no jogo para prender; Esc solta) | Arrastar na metade direita |
-| Atirar | LT (ou RB) | Clique esquerdo ou F | Botão TIRO |
+| Atirar | RT (ou RB) | Clique esquerdo ou F | Botão TIRO |
 | Transformar | Y (no futuro, segurar abre a roda de formas) | Tab ou Q | Botão FORMA |
 | Começar | A | Enter | Tocar na tela |
 | Editor | — | F1 | — |
@@ -161,5 +161,5 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 - **21/11/2026, mapa híbrido:** mapas grandes como as ilhas do Polygonizer; terreno da ilha em heightfield e estruturas em voxel destrutível (Erick).
 - **21/11/2026, cidade:** dobrada para 384 m; estilo **industrial-militar** no lugar do bairro residencial ("bucólico demais"): periferia industrial, torres mais altas e variadas, faixas de luz, vias elevadas, antenas e helipontos (Erick).
 - **22/11/2026, estilo arcade:** o jogo inteiro (Dummy, cidade e HUD) segue o estilo dos arcades de mecha dos anos 90; o Dummy fica com 1,8 m e passa a branco, azul e laranja com painéis luminosos (substitui o "azul e preto" de 21/11) (Erick).
-- **22/11/2026, controle:** tiro no gatilho esquerdo (LT) e freio no A, para mirar com o analógico direito e atirar ao mesmo tempo; em teste (Erick).
+- **22/11/2026, controle:** acelerar no gatilho esquerdo (LT), atirar no gatilho direito (RT) e freio no A, para mirar com o analógico direito e atirar ao mesmo tempo; em teste (Erick).
 - **22/11/2026, repositório:** github.com/erick-azd/age-of-thunders; merge do `m0` na `main` só com a aprovação do portão (Erick).

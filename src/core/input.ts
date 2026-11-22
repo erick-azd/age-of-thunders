@@ -3,9 +3,9 @@ import type { TouchControls } from './touch';
 
 /**
  * Entrada: gamepad (mapeamento "standard") e teclado. Devolve a entrada da sim (pura) a cada passo.
- * Gamepad: analógico esquerdo X = direção, RT (7) = acelerar, A (0) = freio/ré (e confirmar no título),
- *          B (1) = freio de mão, Y (3) = trocar de forma, LT (6) ou RB (5) = atirar, analógico direito = mirar.
- *          (22/11/2026: tiro no LT e freio no A, pedido do Erick para mirar e atirar juntos.)
+ * Gamepad: analógico esquerdo X = direção, LT (6) = acelerar, A (0) = freio/ré (e confirmar no título),
+ *          B (1) = freio de mão, Y (3) = trocar de forma, RT (7) ou RB (5) = atirar, analógico direito = mirar.
+ *          (22/11/2026: acelerar no LT, tiro no RT e freio no A, pedido do Erick para mirar e atirar juntos.)
  * Teclado: W/↑ acelerar, S/↓ freio/ré, A/D ou ←/→ direção, Espaço = freio de mão, Tab ou Q = trocar
  *          de forma, F ou clique = atirar, mouse = mirar (clique no jogo para prender o mouse), Enter = confirmar.
  */
@@ -49,7 +49,7 @@ export class Input {
     let handbrake = k.has('Space');
     if (p) {
       steer = steer || dz(p.axes[0] ?? 0);
-      throttle = Math.max(throttle, p.buttons[7]?.value ?? 0);
+      throttle = Math.max(throttle, p.buttons[6]?.value ?? 0);
       brake = Math.max(brake, p.buttons[0]?.value ?? 0);
       handbrake = handbrake || !!p.buttons[1]?.pressed;
     }
@@ -79,10 +79,10 @@ export class Input {
     return (this.touch?.consumeForm() ?? false) || edge;
   }
 
-  /** Atirar (segurar): clique esquerdo com o mouse preso, F, LT (6) ou RB (5). */
+  /** Atirar (segurar): clique esquerdo com o mouse preso, F, RT (7) ou RB (5). */
   fireHeld(): boolean {
     const p = this.pad();
-    return this.mouseFire || this.keys.has('KeyF') || (p?.buttons[6]?.value ?? 0) > 0.3 || !!p?.buttons[5]?.pressed || !!this.touch?.fire;
+    return this.mouseFire || this.keys.has('KeyF') || (p?.buttons[7]?.value ?? 0) > 0.3 || !!p?.buttons[5]?.pressed || !!this.touch?.fire;
   }
 
   /** Mira: movimento do mouse (px) desde a última leitura e analógico direito (−1 a 1). */

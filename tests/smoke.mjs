@@ -59,10 +59,10 @@ await assert(await page.evaluate(() => !document.querySelector('.title')?.checkV
 
 // Acelera pela rua central por 3 s de jogo (tempo da simulação, não do relógio)
 const p0 = (await st()).pos;
-await btn(7, 1);
+await btn(6, 1);
 await waitFor(() => window.game.debugState().simTime > 3);
 const s1 = await st();
-await btn(7, 0);
+await btn(6, 0);
 await assert(s1.speed > 25 && Math.hypot(s1.pos.x - p0.x, s1.pos.z - p0.z) > 40 && s1.onGround && s1.wallHits === 0, 'o carro deveria acelerar pela rua sem bater');
 await shot('02-carro.png');
 // Curva com freio de mão (derrapagem)
@@ -82,7 +82,7 @@ await waitFor(() => window.game.debugState().morphT >= 0.4);
 await shot('02c-transformando.png');
 await waitFor(() => window.game.debugState().morphT >= 1 && window.game.debugState().physForm === 'bike');
 const s2b = await st();
-await btn(7, 1);
+await btn(6, 1);
 await waitFor((t) => window.game.debugState().simTime > t + 1.0, s2b.simTime);
 await axis(0, 0.6);
 await waitFor((t) => window.game.debugState().simTime > t + 1.6, s2b.simTime);
@@ -90,12 +90,12 @@ const s3 = await st();
 await assert(s3.form === 'bike' && Math.abs(s3.lean) > 0.1, 'a moto deveria inclinar na curva');
 await shot('02d-moto.png');
 await axis(0, 0);
-await btn(7, 0);
-// Canhão (M0.6): LT atira na mira; depois 6 tiros na torre central arrancam voxels e refazem a malha
-await page.evaluate(() => window.game.debugRespawn());
-await btn(6, 1);
-await waitFor(() => window.game.debugState().combat.shots >= 2);
 await btn(6, 0);
+// Canhão (M0.6): RT atira na mira; depois 6 tiros na torre central arrancam voxels e refazem a malha
+await page.evaluate(() => window.game.debugRespawn());
+await btn(7, 1);
+await waitFor(() => window.game.debugState().combat.shots >= 2);
+await btn(7, 0);
 const tower = (await st()).tower;
 for (let i = 0; i < 6; i++) await page.evaluate((t) => window.game.debugFireAt(t[0], t[1] + (Math.random() - 0.5) * 3, t[2]), tower);
 await waitFor(() => window.game.debugState().combat.projectiles === 0 && window.game.debugState().combat.blasts >= 6);

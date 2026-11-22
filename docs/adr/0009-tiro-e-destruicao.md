@@ -45,3 +45,5 @@ O Erick achou que a esfera laranja da explosão (a ideia era um clarão, quase u
 ## Atualização (22/11/2026): tiro no gatilho esquerdo
 
 No controle, mirar (analógico direito) e atirar (RB ou X) ao mesmo tempo ficou difícil. Pedido do Erick, em teste: **LT atira** (RB continua como alternativa) e **A freia e dá ré** (A segue confirmando na tela de título). X deixou de atirar. Teclado, mouse e toque não mudaram.
+
+Logo depois, o Erick trocou de novo: **LT acelera** e **RT atira** (RB continua atirando como alternativa); o freio e a ré seguem no **A**.
