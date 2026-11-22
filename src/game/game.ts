@@ -243,7 +243,6 @@ export class Game {
     const m = new THREE.Vector3();
     this.turret.muzzle.getWorldPosition(m);
     this.projectiles.push(fire(v3(m.x, m.y, m.z), v3(target.x, target.y, target.z), this.weapon));
-    this.flashes.add(m.x, m.y, m.z, 0.45);
     this.cooldown = this.weapon.cooldownS;
     this.stats.shots++;
   }

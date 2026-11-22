@@ -40,4 +40,4 @@ O M0 precisa provar que dá para destruir a cidade atirando, sem travar o jogo. 
 
 ## Atualização (22/11/2026): sem esfera na explosão
 
-O Erick achou que a esfera laranja da explosão (a ideia era um clarão, quase uma fumaça) não ficou boa e pediu para tirar por enquanto. A explosão agora mostra só o entulho e o buraco. O clarão pequeno na boca do canhão continua. A classe `Flashes` ficou no código para uma próxima tentativa (por exemplo, partículas de fumaça ou um anel no chão).
+O Erick achou que a esfera laranja da explosão (a ideia era um clarão, quase uma fumaça) não ficou boa e pediu para tirar por enquanto. A explosão agora mostra só o entulho e o buraco. Logo depois, a pedido dele, saiu também o clarão pequeno da boca do canhão: o tiro mostra só o projétil, o entulho e o buraco. A classe `Flashes` ficou no código para uma próxima tentativa (por exemplo, partículas de fumaça ou um anel no chão).
