@@ -26,7 +26,7 @@ Regra: estudar e reimplementar, nunca copiar código, dados, nomes ou assets.
 
 Verbos do jogador:
 
-1. **Pilotar:** cada forma tem uma física própria e legível. Carro aderente e com derrapagem controlável; hover desliza e sobe degraus baixos; avião rápido, sem stall punitivo. Valores iniciais generosos.
+1. **Pilotar:** cada forma tem uma física própria e legível. Carro aderente e com derrapagem controlável; moto ágil, que inclina nas curvas e não cai sozinha; hover desliza e sobe degraus baixos; avião rápido, sem stall punitivo. Valores iniciais generosos.
 2. **Transformar:** um botão e uma roda de formas. A transformação dura cerca de 0,6 s, com as peças deslizando e girando em volta do Dummy, e deve ser **satisfatória de ver** e útil no combate (fugir pelo ar, virar tanque para aguentar dano).
 3. **Atirar:** mira assistida generosa no começo; o impacto mostra blocos voando.
 4. **Destruir:** derrubar a cobertura do inimigo ou um prédio inteiro em cima dele é uma tática, não só efeito visual.
@@ -56,8 +56,8 @@ O **Dummy é sempre o mesmo personagem** e fica visível: no assento da moto, no
 | Forma | Papel | Marco |
 | --- | --- | --- |
 | Carro (4 rodas) | Equilíbrio, padrão de partida | M0 |
-| Hover | Mobilidade, atravessa água e entulho | M0 |
-| Moto (2 rodas) | Velocidade e manobra | M1 |
+| Moto (2 rodas) | Velocidade e manobra | M0 |
+| Hover | Mobilidade, atravessa água e entulho | M1 |
 | Tanque | Resistência e dano alto, lento | M1 |
 | Helicóptero | Pairar e atirar de cima | M2 |
 | Avião | Velocidade no ar, passadas | M2 |
@@ -94,8 +94,8 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 
 | Marco | Entrega | Portão |
 | --- | --- | --- |
-| M0 | Arena pequena de voxels 0,5 m; o Dummy em carro e hover com a transformação entre eles; tiro que destrói blocos | O Erick joga no desktop e no celular e aprova a sensação |
-| M1 | Moto e tanque; desabamento por falta de apoio; mata-mata contra bots; HUD | Partida completa divertida |
+| M0 | Arena pequena de voxels 0,5 m; o Dummy em carro e moto com a transformação entre eles; tiro que destrói blocos | O Erick joga no desktop e no celular e aprova a sensação |
+| M1 | Hover e tanque; desabamento por falta de apoio; mata-mata contra bots; HUD | Partida completa divertida |
 | M1.1 | Editor de parâmetros completo, refino de controle | Aprovação do Erick |
 | M2 | Helicóptero e avião; arena maior com rotas aéreas | Combate ar-solo funciona |
 | M3+ | Online, Dummy a pé, novas arenas | A definir |
@@ -118,3 +118,4 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 - **21/11/2026, mundo:** voxels de 0,5 m, destruição real com entulho e desabamento (Erick).
 - **21/11/2026, oponentes:** bots agora, online depois (Erick).
 - **21/11/2026, M0:** Dummy + carro e hover + arena de voxels destrutível (Erick).
+- **21/11/2026, M0 revisado:** o M0 começa com **carro e moto**; o hover passa para o M1, junto com o tanque (Erick).
