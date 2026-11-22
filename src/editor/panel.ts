@@ -4,7 +4,7 @@
  * "Salvar" grava o JSON em data/ pelo servidor de desenvolvimento (npm run dev).
  */
 export interface Spec { key: string; label: string; min: number; max: number; step: number; unit?: string }
-export interface Section { title: string; specs: readonly Spec[]; values: Record<string, number>; file?: string }
+export interface Section { title: string; specs: readonly Spec[]; values: Record<string, number>; file?: string; onChange?: () => void }
 
 export class EditorPanel {
   readonly el = document.createElement('div');
@@ -30,7 +30,7 @@ export class EditorPanel {
         const input = document.createElement('input');
         Object.assign(input, { type: 'range', min: String(spec.min), max: String(spec.max), step: String(spec.step), value: String(s.values[spec.key]) });
         const show = () => { val.textContent = `${s.values[spec.key]}${spec.unit ? ` ${spec.unit}` : ''}`; };
-        input.addEventListener('input', () => { s.values[spec.key] = Number(input.value); show(); });
+        input.addEventListener('input', () => { s.values[spec.key] = Number(input.value); show(); s.onChange?.(); });
         row.append(spec.label, input, val);
         show();
         box.appendChild(row);

@@ -4,6 +4,7 @@
 //                             e o endpoint local do editor (POST /__editor/save grava em data/)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { networkInterfaces } from 'node:os';
 import { dirname, join, normalize, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
@@ -79,5 +80,11 @@ if (!serve) {
     if (handleSave(req, res)) return;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(html);
-  }).listen(5173, () => console.log('dev: http://localhost:5173  (Ctrl+C para sair)'));
+  }).listen(5173, '0.0.0.0', () => {
+    console.log('dev: http://localhost:5173  (Ctrl+C para sair)');
+    // Endereços na rede local, para abrir no celular (mesma rede Wi-Fi). O editor só grava pelo PC.
+    for (const list of Object.values(networkInterfaces())) for (const a of list ?? []) {
+      if (a.family === 'IPv4' && !a.internal) console.log(`celular: http://${a.address}:5173`);
+    }
+  });
 }

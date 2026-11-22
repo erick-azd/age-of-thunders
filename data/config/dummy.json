@@ -1,0 +1,71 @@
+{
+  "heightM": 1.8,
+  "colors": {
+    "white": "#eceef2",
+    "armor": "#2a56d8",
+    "accent": "#f28a1a",
+    "frame": "#5a606c",
+    "dark": "#23262d",
+    "glow": "#3dffb0"
+  },
+  "poses": {
+    "tpose": {
+      "label": "T-pose",
+      "rootY": 1.0,
+      "joints": {
+        "shoulderL": [0, 0, -90],
+        "shoulderR": [0, 0, 90]
+      }
+    },
+    "standing": {
+      "label": "Em pé",
+      "rootY": 1.0,
+      "joints": {
+        "shoulderL": [4, 0, -9],
+        "shoulderR": [4, 0, 9],
+        "elbowL": [12, 0, 0],
+        "elbowR": [12, 0, 0],
+        "hipL": [0, 0, -3],
+        "hipR": [0, 0, 3]
+      }
+    },
+    "car": {
+      "label": "Carro",
+      "rootY": 0.1,
+      "joints": {
+        "spine": [10, 0, 0],
+        "chest": [0, 0, 0],
+        "head": [-8, 0, 0],
+        "shoulderL": [50, 0, 8],
+        "shoulderR": [50, 0, -8],
+        "elbowL": [38, 0, 0],
+        "elbowR": [38, 0, 0],
+        "hipL": [84, 0, -6],
+        "hipR": [84, 0, 6],
+        "kneeL": [-62, 0, 0],
+        "kneeR": [-62, 0, 0],
+        "ankleL": [-20, 0, 0],
+        "ankleR": [-20, 0, 0]
+      }
+    },
+    "bike": {
+      "label": "Moto",
+      "rootY": 0.1,
+      "joints": {
+        "spine": [-24, 0, 0],
+        "chest": [-14, 0, 0],
+        "head": [30, 0, 0],
+        "shoulderL": [100, 0, -12],
+        "shoulderR": [100, 0, 12],
+        "elbowL": [30, 0, 0],
+        "elbowR": [30, 0, 0],
+        "hipL": [58, 0, -14],
+        "hipR": [58, 0, 14],
+        "kneeL": [-112, 0, 0],
+        "kneeR": [-112, 0, 0],
+        "ankleL": [40, 0, 0],
+        "ankleR": [40, 0, 0]
+      }
+    }
+  }
+}

@@ -2,11 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
-import playerJson from '../data/config/player.json';
+import carJson from '../data/config/carro.json';
+import districtJson from '../data/world/bairro.json';
+import { DistrictSchema, generateDistrict } from '../src/procgen/district';
 import { Terrain, WorldSchema } from '../src/procgen/terrain';
 import worldJson from '../data/world/mundo.json';
 import { v3 } from '../src/sim/math';
-import { PlayerParamsSchema, createPlayer, stepPlayer } from '../src/sim/player';
+import { Arena } from '../src/sim/arena';
+import { CarParamsSchema, createCar, stepCar } from '../src/sim/car';
 
 /**
  * Proteção da arquitetura (ADR 0018 do Polygonizer): `src/sim` e `src/procgen` são puros, então
@@ -29,12 +32,14 @@ test('pureza: src/sim e src/procgen sem relógio, DOM, Math.random nem three', (
 });
 
 test('pureza: estado copiado no meio termina igual ao original', () => {
-  const world = new Terrain(WorldSchema.parse(worldJson)).generate();
-  const p = PlayerParamsSchema.parse(playerJson);
-  const a = createPlayer(v3(0, 120, 1200), 0, 40);
-  const input = (t: number) => ({ steer: Math.sin(t * 0.7), throttle: 1, climb: Math.cos(t * 0.3) * 0.5 });
-  for (let i = 0; i < 600; i++) stepPlayer(a, input(a.time), p, world, 1 / 60);
+  const tdef = WorldSchema.parse(worldJson), ddef = DistrictSchema.parse(districtJson);
+  const grid = generateDistrict(ddef, v3(-ddef.sizeM / 2, tdef.plateauHeight - 0.5, -ddef.sizeM / 2)).grid;
+  const world = new Arena(new Terrain(tdef).generate(), grid);
+  const p = CarParamsSchema.parse(carJson);
+  const a = createCar(v3(2.5, tdef.plateauHeight + 0.5, 150), 0);
+  const input = (t: number) => ({ steer: Math.sin(t * 0.7), throttle: 1, brake: 0, handbrake: Math.cos(t * 0.9) > 0.8 });
+  for (let i = 0; i < 600; i++) stepCar(a, input(a.time), p, world, 1 / 60);
   const b = structuredClone(a); // falha se o estado tiver funções
-  for (let i = 0; i < 600; i++) { stepPlayer(a, input(a.time), p, world, 1 / 60); stepPlayer(b, input(b.time), p, world, 1 / 60); }
+  for (let i = 0; i < 600; i++) { stepCar(a, input(a.time), p, world, 1 / 60); stepCar(b, input(b.time), p, world, 1 / 60); }
   assert.deepEqual(b, a);
 });

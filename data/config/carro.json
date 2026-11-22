@@ -1,0 +1,20 @@
+{
+  "maxSpeed": 38,
+  "reverseSpeed": 12,
+  "accel": 16,
+  "brake": 34,
+  "drag": 0.12,
+  "rolling": 1.6,
+  "turnRateDeg": 105,
+  "turnFullSpeed": 7,
+  "highSpeedTurn": 0.55,
+  "grip": 9,
+  "handbrakeGrip": 1,
+  "handbrakeTurn": 1.5,
+  "stepUp": 0.55,
+  "bounce": 0.35,
+  "gravity": 24,
+  "width": 2,
+  "length": 4.2,
+  "height": 1.4
+}

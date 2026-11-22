@@ -1,0 +1,8 @@
+{
+  "cooldownS": 0.22,
+  "speed": 140,
+  "gravity": 4,
+  "lifeS": 3,
+  "blastRadiusM": 1.6,
+  "rangeM": 320
+}

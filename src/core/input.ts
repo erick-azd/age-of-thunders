@@ -1,18 +1,37 @@
-import type { PlayerInput } from '../sim/player';
+import type { CarInput } from '../sim/car';
+import type { TouchControls } from './touch';
 
 /**
  * Entrada: gamepad (mapeamento "standard") e teclado. Devolve a entrada da sim (pura) a cada passo.
- * Gamepad: analógico esquerdo X = virar, Y = subir/descer, RT (botão 7) = acelerar, A (0) = confirmar.
- * Teclado: setas/WASD, Espaço = acelerar, Enter = confirmar.
+ * Gamepad: analógico esquerdo X = direção, LT (6) = acelerar, LB (4) = freio/ré, RT (7) ou RB (5) = atirar,
+ *          B (1) = freio de mão, Y (3) = trocar de forma, analógico direito = mirar, A (0) = confirmar no título.
+ *          (22/11/2026: acelerar e frear na mão esquerda, atirar e mirar na direita, pedido do Erick.)
+ * Teclado: W/↑ acelerar, S/↓ freio/ré, A/D ou ←/→ direção, Espaço = freio de mão, Tab ou Q = trocar
+ *          de forma, F ou clique = atirar, mouse = mirar (clique no jogo para prender o mouse), Enter = confirmar.
  */
 export class Input {
   private keys = new Set<string>();
   private prevA = false;
+  private prevForm = false;
+  private mouseDX = 0;
+  private mouseDY = 0;
+  private mouseFire = false;
+  /** O mouse está preso no jogo (clique no jogo para prender; Esc solta). */
+  locked = false;
+  /** Controles de toque, quando ligados (celular). */
+  touch: TouchControls | null = null;
 
   constructor(target: Window) {
-    target.addEventListener('keydown', (e) => { this.keys.add(e.code); if (e.code === 'F1') e.preventDefault(); });
+    target.addEventListener('keydown', (e) => {
+      this.keys.add(e.code);
+      if (e.code === 'F1' || e.code === 'Space' || e.code === 'Tab' || e.code.startsWith('Arrow')) e.preventDefault();
+    });
     target.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    target.addEventListener('blur', () => this.keys.clear());
+    target.addEventListener('blur', () => { this.keys.clear(); this.mouseFire = false; });
+    target.addEventListener('mousemove', (e) => { if (this.locked) { this.mouseDX += e.movementX; this.mouseDY += e.movementY; } });
+    target.addEventListener('mousedown', (e) => { if (this.locked && e.button === 0) this.mouseFire = true; });
+    target.addEventListener('mouseup', (e) => { if (e.button === 0) this.mouseFire = false; });
+    document.addEventListener('pointerlockchange', () => { this.locked = !!document.pointerLockElement; if (!this.locked) this.mouseFire = false; });
   }
 
   private pad(): Gamepad | null {
@@ -21,18 +40,27 @@ export class Input {
     return null;
   }
 
-  read(): PlayerInput {
+  read(): CarInput {
     const k = this.keys, p = this.pad();
     const dz = (v: number) => (Math.abs(v) < 0.12 ? 0 : v);
     let steer = (k.has('ArrowRight') || k.has('KeyD') ? 1 : 0) - (k.has('ArrowLeft') || k.has('KeyA') ? 1 : 0);
-    let climb = (k.has('ArrowUp') || k.has('KeyW') ? 1 : 0) - (k.has('ArrowDown') || k.has('KeyS') ? 1 : 0);
-    let throttle = k.has('Space') ? 1 : 0;
+    let throttle = k.has('ArrowUp') || k.has('KeyW') ? 1 : 0;
+    let brake = k.has('ArrowDown') || k.has('KeyS') ? 1 : 0;
+    let handbrake = k.has('Space');
     if (p) {
       steer = steer || dz(p.axes[0] ?? 0);
-      climb = climb || -dz(p.axes[1] ?? 0);
-      throttle = Math.max(throttle, p.buttons[7]?.value ?? 0);
+      throttle = Math.max(throttle, p.buttons[6]?.value ?? 0);
+      brake = Math.max(brake, p.buttons[4]?.value ?? 0);
+      handbrake = handbrake || !!p.buttons[1]?.pressed;
     }
-    return { steer, throttle, climb };
+    const t = this.touch;
+    if (t) {
+      steer = steer || t.steer;
+      throttle = Math.max(throttle, t.throttle);
+      brake = Math.max(brake, t.brake);
+      handbrake = handbrake || t.handbrake;
+    }
+    return { steer, throttle, brake, handbrake };
   }
 
   /** "A" ou Enter acabou de ser apertado (borda de subida). */
@@ -40,7 +68,30 @@ export class Input {
     const now = this.keys.has('Enter') || !!this.pad()?.buttons[0]?.pressed;
     const edge = now && !this.prevA;
     this.prevA = now;
-    return edge;
+    return (this.touch?.consumeTap() ?? false) || edge;
+  }
+
+  /** Troca de forma (Tab ou Y) acabou de ser apertada. */
+  formPressed(): boolean {
+    const now = this.keys.has('Tab') || this.keys.has('KeyQ') || !!this.pad()?.buttons[3]?.pressed;
+    const edge = now && !this.prevForm;
+    this.prevForm = now;
+    return (this.touch?.consumeForm() ?? false) || edge;
+  }
+
+  /** Atirar (segurar): clique esquerdo com o mouse preso, F, RT (7) ou RB (5). */
+  fireHeld(): boolean {
+    const p = this.pad();
+    return this.mouseFire || this.keys.has('KeyF') || (p?.buttons[7]?.value ?? 0) > 0.3 || !!p?.buttons[5]?.pressed || !!this.touch?.fire;
+  }
+
+  /** Mira: movimento do mouse (px) desde a última leitura e analógico direito (−1 a 1). */
+  readAim(): { mouseX: number; mouseY: number; stickX: number; stickY: number } {
+    const p = this.pad(), dz = (v: number) => (Math.abs(v) < 0.15 ? 0 : v);
+    const t = this.touch?.consumeAim() ?? { dx: 0, dy: 0 };
+    const out = { mouseX: this.mouseDX + t.dx * 1.6, mouseY: this.mouseDY + t.dy * 1.6, stickX: dz(p?.axes[2] ?? 0), stickY: dz(p?.axes[3] ?? 0) };
+    this.mouseDX = this.mouseDY = 0;
+    return out;
   }
 
   has(code: string): boolean { return this.keys.has(code); }
