@@ -80,8 +80,9 @@ export class Game {
     this.sky = createSky(P.skyZenith, P.skyHorizon, P.skyGround);
     this.scene.add(this.sky);
     this.scene.fog = new THREE.Fog(P.skyHorizon, 1200, 5500);
-    this.scene.add(new THREE.HemisphereLight(P.skyHorizon, '#5a7a3a', 1.6));
-    const sun = new THREE.DirectionalLight('#fff4c2', 1.8);
+    // Luz arcade (ADR 0005): céu frio e chão neutro, sol branco forte; brancos ficam brancos.
+    this.scene.add(new THREE.HemisphereLight('#e4f0ff', '#8c8478', 1.7));
+    const sun = new THREE.DirectionalLight('#ffffff', 2.1);
     sun.position.set(0.6, 1, 0.3);
     this.scene.add(sun);
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { type DummyPose, type Rig, writePose } from '../procgen/dummy';
+import { linearColors } from './mesh-utils';
 
 /**
  * Vista do Dummy: uma malha só (1 draw call) com os vértices transformados na CPU a cada pose
@@ -14,7 +15,8 @@ export class DummyView {
     this.pos = new THREE.BufferAttribute(new Float32Array(rig.vertexCount * 3), 3);
     this.pos.setUsage(THREE.DynamicDrawUsage);
     g.setAttribute('position', this.pos);
-    g.setAttribute('color', new THREE.Float32BufferAttribute(rig.colors, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(linearColors(rig.colors), 3));
+    g.setAttribute('glow', new THREE.Float32BufferAttribute(rig.glow, 1)); // viseira e painéis
     this.mesh = new THREE.Mesh(g, material);
     this.mesh.name = 'dummy';
   }

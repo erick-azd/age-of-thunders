@@ -3,7 +3,7 @@ import { DEG } from '../sim/math';
 import { MeshBuilder, type RGB, type V, hexToRgb } from './mesh-builder';
 
 /**
- * O Dummy (M0.2, ADR 0004): boneco articulado de peças rígidas facetadas com juntas pretas,
+ * O Dummy (M0.2, ADR 0004 e 0005): piloto de peças rígidas facetadas em estilo mecha arcade,
  * montado por código. Puro (sem Three.js). Cada peça pertence a uma junta; uma pose é um conjunto de
  * rotações por junta (graus nos dados). `writePose` transforma os vértices na CPU para uma malha
  * única (1 draw call), o mesmo esquema que servirá à carcaça que se transforma.
@@ -30,7 +30,8 @@ export type DummyPose = z.infer<typeof PoseSchema>;
 
 export const DummySchema = z.object({
   heightM: z.number().min(1).max(3).default(1.8),
-  colors: z.object({ body: Hex, bodyDark: Hex, joint: Hex }),
+  /** Paleta arcade (ADR 0005): corpo branco, armadura azul, detalhes laranja, estrutura cinza, juntas e brilho. */
+  colors: z.object({ white: Hex, armor: Hex, accent: Hex, frame: Hex, dark: Hex, glow: Hex }),
   poses: z.record(z.string(), PoseSchema),
 });
 export type DummyDef = z.infer<typeof DummySchema>;
@@ -41,7 +42,8 @@ export const DUMMY_SPECS = [{ key: 'heightM', label: 'Altura do Dummy', min: 1.2
 export const BASE_HEIGHT = 1.84;
 
 interface Part { joint: Joint; parent: Joint | null; offset: V; positions: number[] }
-export interface Rig { parts: Part[]; colors: number[]; vertexCount: number; scale: number }
+/** `glow` por vértice (0 ou 1): viseira e painéis que brilham. */
+export interface Rig { parts: Part[]; colors: number[]; glow: number[]; vertexCount: number; scale: number }
 
 /** Bloco facetado (octógono esticado) de y0 a y1, com largura w e profundidade d na base. */
 function seg(b: MeshBuilder, y0: number, y1: number, w: number, d: number, taper: number, color: RGB): void {
@@ -49,66 +51,96 @@ function seg(b: MeshBuilder, y0: number, y1: number, w: number, d: number, taper
   b.push().translate(0, y0, 0).scale((w / 2) * k, 1, (d / 2) * k).rotateY(Math.PI / 8).cylinder(1, taper, y1 - y0, 8, color).pop();
 }
 const ball = (b: MeshBuilder, x: number, y: number, zz: number, r: number, c: RGB) => b.push().translate(x, y, zz).ico(r, c).pop();
+const boxAt = (b: MeshBuilder, x: number, y: number, zz: number, w: number, h: number, d: number, c: RGB, rx = 0, rz = 0) =>
+  b.push().translate(x, y, zz).rotateX(rx).rotateZ(rz).box(w, h, d, c).pop();
 
-/** Monta as peças do Dummy. Cada peça é desenhada no espaço da sua junta. */
+/**
+ * Monta as peças do Dummy no estilo "piloto-mecha arcade dos anos 90" (design original): armadura
+ * em placas, ombreiras e pés grandes, cabeça pequena com viseira, painéis luminosos e mochila com
+ * dois propulsores. Cada peça é desenhada no espaço da sua junta; `glow` desenha as partes que brilham.
+ */
 export function buildDummyRig(def: DummyDef): Rig {
-  const B = hexToRgb(def.colors.body), D = hexToRgb(def.colors.bodyDark), K = hexToRgb(def.colors.joint);
+  const C = def.colors;
+  const W = hexToRgb(C.white), A = hexToRgb(C.armor), O = hexToRgb(C.accent), F = hexToRgb(C.frame), K = hexToRgb(C.dark), G = hexToRgb(C.glow);
   const parts: Part[] = [];
   const colors: number[] = [];
-  const add = (joint: Joint, parent: Joint | null, offset: V, draw: (b: MeshBuilder) => void) => {
+  const glow: number[] = [];
+  const add = (joint: Joint, parent: Joint | null, offset: V, draw: (b: MeshBuilder) => void, lit?: (b: MeshBuilder) => void) => {
     const b = new MeshBuilder();
     draw(b);
-    const m = b.build();
-    parts.push({ joint, parent, offset, positions: m.positions });
-    colors.push(...m.colors);
+    const solid = b.build();
+    const n0 = solid.positions.length;
+    const g = new MeshBuilder();
+    lit?.(g);
+    const shine = g.build();
+    parts.push({ joint, parent, offset, positions: [...solid.positions, ...shine.positions] });
+    colors.push(...solid.colors, ...shine.colors);
+    for (let i = 0; i < n0 / 3; i++) glow.push(0);
+    for (let i = 0; i < shine.positions.length / 3; i++) glow.push(1);
   };
 
   // Tronco
   add('root', null, [0, 0, 0], (b) => {
-    seg(b, -0.11, 0.06, 0.3, 0.2, 1.12, B); // pelve
-    b.push().translate(0, -0.02, -0.105).box(0.14, 0.1, 0.02, D).pop(); // placa frontal
+    seg(b, -0.11, 0.06, 0.3, 0.2, 1.12, F); // pelve
+    boxAt(b, 0, -0.05, -0.115, 0.2, 0.15, 0.03, W, 0.15); // saia frontal
+    boxAt(b, 0, 0.02, -0.128, 0.08, 0.05, 0.03, O); // fivela
+    for (const s of [-1, 1]) boxAt(b, 0.17 * s, -0.04, 0, 0.04, 0.15, 0.15, A); // placas laterais
     ball(b, -0.1, -0.08, 0, 0.06, K);
     ball(b, 0.1, -0.08, 0, 0.06, K);
   });
   add('spine', 'root', [0, 0.06, 0], (b) => {
-    seg(b, 0, 0.07, 0.2, 0.15, 1, K); // abdômen segmentado
-    seg(b, 0.07, 0.09, 0.23, 0.17, 1, D);
-    seg(b, 0.09, 0.16, 0.21, 0.15, 1, K);
+    seg(b, 0, 0.07, 0.19, 0.14, 1, F);
+    seg(b, 0.07, 0.09, 0.22, 0.16, 1, K);
+    seg(b, 0.09, 0.16, 0.2, 0.14, 1, F);
   });
   add('chest', 'spine', [0, 0.16, 0], (b) => {
-    seg(b, 0, 0.12, 0.3, 0.2, 1.22, B); // costelas até o peito
-    seg(b, 0.12, 0.27, 0.37, 0.24, 0.92, B); // peito largo
-    seg(b, 0.27, 0.3, 0.32, 0.2, 0.8, D); // ombreira do pescoço
-    // Placa do peito em V, levemente saltada.
-    b.push().translate(-0.07, 0.18, -0.125).rotateZ(0.25).box(0.13, 0.11, 0.025, D).pop();
-    b.push().translate(0.07, 0.18, -0.125).rotateZ(-0.25).box(0.13, 0.11, 0.025, D).pop();
-    ball(b, -0.205, 0.245, 0, 0.055, K);
-    ball(b, 0.205, 0.245, 0, 0.055, K);
+    seg(b, 0, 0.12, 0.3, 0.2, 1.25, W); // costelas brancas
+    seg(b, 0.12, 0.28, 0.41, 0.26, 0.86, A); // peitoral azul largo
+    seg(b, 0.27, 0.31, 0.26, 0.2, 0.8, F); // gola
+    for (const s of [-1, 1]) {
+      boxAt(b, 0.09 * s, 0.17, -0.13, 0.15, 0.1, 0.03, A, 0, -0.18 * s); // placas do peito
+      boxAt(b, 0.205 * s, 0.15, -0.05, 0.03, 0.06, 0.09, O); // respiros laranja
+      ball(b, 0.215 * s, 0.245, 0, 0.055, K);
+    }
+    // Mochila com dois propulsores.
+    boxAt(b, 0, 0.17, 0.17, 0.26, 0.22, 0.12, F);
+    boxAt(b, 0, 0.26, 0.2, 0.2, 0.05, 0.08, A);
+    for (const s of [-1, 1]) b.push().translate(0.07 * s, -0.01, 0.21).cylinder(0.05, 0.035, 0.08, 6, O).pop();
+  }, (g) => {
+    boxAt(g, 0, 0.22, -0.143, 0.11, 0.035, 0.012, G); // painel do peito
+    for (const s of [-1, 1]) boxAt(g, 0.07 * s, 0.215, 0.233, 0.05, 0.03, 0.01, G); // luzes da mochila
   });
   add('neck', 'chest', [0, 0.3, 0], (b) => { b.cylinder(0.045, 0.04, 0.08, 6, K); });
   add('head', 'neck', [0, 0.07, 0], (b) => {
-    seg(b, 0, 0.04, 0.12, 0.14, 1.35, K); // queixo
-    seg(b, 0.04, 0.15, 0.17, 0.2, 1.08, B); // rosto liso, sem feições
-    seg(b, 0.15, 0.26, 0.185, 0.215, 0.62, B); // topo facetado
-    b.push().translate(0, 0.12, -0.105).box(0.12, 0.045, 0.012, D).pop(); // vinco da viseira
+    seg(b, 0, 0.05, 0.12, 0.13, 1.3, K); // queixo
+    seg(b, 0.05, 0.16, 0.17, 0.2, 1.0, W); // capacete
+    seg(b, 0.16, 0.235, 0.17, 0.2, 0.62, A); // topo azul
+    boxAt(b, 0, 0.235, 0.01, 0.03, 0.05, 0.17, A); // crista
+    for (const s of [-1, 1]) boxAt(b, 0.09 * s, 0.1, 0, 0.02, 0.07, 0.1, O); // orelhas laranja
+  }, (g) => {
+    boxAt(g, 0, 0.12, -0.1, 0.15, 0.035, 0.02, G); // viseira
   });
 
   // Braços (o esquerdo fica em −X)
   for (const [s, side] of [[-1, 'L'], [1, 'R']] as const) {
     const sh = `shoulder${side}` as Joint, el = `elbow${side}` as Joint, wr = `wrist${side}` as Joint;
     add(sh, 'chest', [0.235 * s, 0.245, 0], (b) => {
-      b.push().translate(0.02 * s, -0.04, 0).box(0.13, 0.13, 0.14, B).pop(); // ombreira
-      seg(b, -0.28, -0.09, 0.085, 0.085, 1.12, B);
-      b.push().translate(0.045 * s, -0.19, 0).box(0.012, 0.12, 0.05, K).pop(); // fresta lateral
-      ball(b, 0, -0.3, 0, 0.045, K);
+      boxAt(b, 0.05 * s, -0.02, 0, 0.17, 0.15, 0.2, A, 0, 0.12 * s); // ombreira grande
+      boxAt(b, 0.12 * s, -0.09, 0, 0.05, 0.05, 0.21, O); // ponta laranja
+      seg(b, -0.28, -0.09, 0.085, 0.085, 1.1, W);
+      ball(b, 0, -0.3, 0, 0.045, F);
+    }, (g) => {
+      boxAt(g, 0.142 * s, 0.0, 0, 0.012, 0.03, 0.12, G, 0, 0.12 * s); // faixa da ombreira
     });
     add(el, sh, [0, -0.3, 0], (b) => {
-      seg(b, -0.25, -0.03, 0.075, 0.08, 1.25, B);
+      seg(b, -0.25, -0.03, 0.1, 0.11, 1.15, W); // antebraço robusto
+      seg(b, -0.25, -0.18, 0.115, 0.125, 1, A); // punho azul
+      boxAt(b, 0.06 * s, -0.12, 0, 0.012, 0.08, 0.05, O);
       ball(b, 0, -0.265, 0, 0.032, K);
     });
     add(wr, el, [0, -0.27, 0], (b) => {
-      b.push().translate(0, -0.055, -0.005).box(0.045, 0.1, 0.085, K).pop(); // mão
-      b.push().translate(-0.03 * s, -0.04, -0.02).box(0.02, 0.06, 0.03, K).pop(); // polegar
+      boxAt(b, 0, -0.055, -0.005, 0.05, 0.1, 0.09, F); // mão
+      boxAt(b, -0.03 * s, -0.04, -0.02, 0.02, 0.06, 0.03, F); // polegar
     });
   }
 
@@ -116,22 +148,28 @@ export function buildDummyRig(def: DummyDef): Rig {
   for (const [s, side] of [[-1, 'L'], [1, 'R']] as const) {
     const hp = `hip${side}` as Joint, kn = `knee${side}` as Joint, an = `ankle${side}` as Joint;
     add(hp, 'root', [0.1 * s, -0.08, 0], (b) => {
-      seg(b, -0.41, -0.05, 0.12, 0.13, 1.22, B);
-      b.push().translate(0, -0.25, -0.07).box(0.07, 0.14, 0.02, D).pop(); // placa da coxa
+      seg(b, -0.41, -0.05, 0.13, 0.14, 1.2, W);
+      boxAt(b, 0.075 * s, -0.2, 0, 0.03, 0.22, 0.12, A); // armadura lateral da coxa
       ball(b, 0, -0.43, 0, 0.055, K);
     });
     add(kn, hp, [0, -0.43, 0], (b) => {
-      seg(b, -0.39, -0.04, 0.095, 0.11, 1.25, B);
-      b.push().translate(0, -0.06, -0.06).box(0.08, 0.08, 0.03, D).pop(); // joelheira
-      ball(b, 0, -0.41, 0, 0.035, K);
+      seg(b, -0.39, -0.04, 0.15, 0.17, 0.72, W); // canela larga embaixo
+      boxAt(b, 0, -0.06, -0.085, 0.11, 0.12, 0.04, A); // joelheira
+      boxAt(b, 0, -0.24, 0.09, 0.1, 0.18, 0.04, A); // panturrilha
+      boxAt(b, 0.085 * s, -0.3, 0, 0.012, 0.1, 0.06, O);
+      ball(b, 0, -0.41, 0, 0.035, F);
+    }, (g) => {
+      boxAt(g, 0, -0.05, -0.107, 0.06, 0.025, 0.01, G); // luz da joelheira
     });
     add(an, kn, [0, -0.42, 0], (b) => {
-      b.push().translate(0, -0.03, -0.04).box(0.1, 0.07, 0.23, B).pop();
-      b.push().translate(0, -0.07, -0.04).box(0.105, 0.02, 0.24, K).pop(); // sola
+      boxAt(b, 0, -0.03, -0.04, 0.14, 0.09, 0.28, A); // pé grande
+      boxAt(b, 0, -0.05, -0.18, 0.13, 0.05, 0.06, F); // biqueira
+      boxAt(b, 0, -0.02, 0.11, 0.1, 0.06, 0.05, O); // calcanhar laranja
+      boxAt(b, 0, -0.08, -0.04, 0.15, 0.02, 0.29, K); // sola
     });
   }
 
-  return { parts, colors, vertexCount: colors.length / 3, scale: def.heightM / BASE_HEIGHT };
+  return { parts, colors, glow, vertexCount: colors.length / 3, scale: def.heightM / BASE_HEIGHT };
 }
 
 // ---- matrizes 3×4 (linhas) ----

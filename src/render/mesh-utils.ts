@@ -1,11 +1,21 @@
 import * as THREE from 'three';
 import type { MeshData } from '../procgen/mesh-builder';
 
+/**
+ * As cores dos dados são sRGB (como no editor de imagem); o Three.js espera cor de vértice linear.
+ * Sem esta conversão tudo fica lavado e pouco saturado (ADR 0005).
+ */
+export function linearColors(c: ArrayLike<number>): Float32Array {
+  const out = new Float32Array(c.length);
+  for (let i = 0; i < c.length; i++) { const v = c[i]; out[i] = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  return out;
+}
+
 /** Converte MeshData neutro (procgen) em BufferGeometry com cor por vértice e normais chapadas. */
 export function toGeometry(m: MeshData): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(m.positions, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(m.colors, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(linearColors(m.colors), 3));
   if (m.glow) g.setAttribute('glow', new THREE.Float32BufferAttribute(m.glow, 1));
   g.computeVertexNormals();
   g.computeBoundingSphere();

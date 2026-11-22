@@ -14,17 +14,13 @@
   "plateauHeight": 14,
   "palette": {
     "sand": "#ecd39a",
-    "grass": [
-      "#63bf4f",
-      "#57b347",
-      "#4aa63f"
-    ],
+    "grass": ["#4f9e3a", "#479434", "#3f8a2f"],
     "rock": "#8f857a",
     "snow": "#f2f5f8",
     "forest": "#2f8a36",
-    "ocean": "#1c9cc4",
-    "skyZenith": "#1d5fd6",
-    "skyHorizon": "#a9d8f2",
-    "skyGround": "#7fc0e0"
+    "ocean": "#1690d0",
+    "skyZenith": "#1440c8",
+    "skyHorizon": "#9ad8ff",
+    "skyGround": "#6fb8e8"
   }
 }

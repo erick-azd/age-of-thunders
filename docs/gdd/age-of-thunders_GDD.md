@@ -18,6 +18,7 @@ Você é o **Dummy**, um boneco articulado que pilota uma carcaça mecânica cap
 | Bonecos articulados impressos em 3D (`References/Images/Character_Dummy`) | Peças rígidas, juntas pretas aparentes, rosto liso facetado, plástico fosco de uma cor + preto | Copiar um modelo de produto específico; o Dummy é desenho nosso |
 | Polygonizer (projeto do Erick) | Ilha urbana como arena, voo arcade, orçamento de draw calls, pousos tolerantes | Túneis e tetos que a física não sustenta |
 | Jogos de voxel destrutível (gênero) | Destruição por blocos, desabamento por falta de apoio, entulho | Mundo blocado demais; aqui o voxel é de 0,5 m e chapado como o low-poly |
+| Arcades de mecha dos anos 90 em placa Model 2 (`References/Images/Virtual On`) | Estilo: cores saturadas (branco, azul, laranja), armadura em placas, ombros e pés grandes, painéis luminosos, arenas com faixas fortes, HUD arcade de barras grandes e cronômetro | Copiar robôs, nomes, armas ou o HUD do jogo; o design é nosso |
 | Combate veicular em arena (gênero) | Ritmo de partida curta, coleta de armas e reparo | Controles de simulação; aqui é arcade |
 
 Regra: estudar e reimplementar, nunca copiar código, dados, nomes ou assets.
@@ -33,7 +34,8 @@ Verbos do jogador:
 
 ## 4. Visual e orçamento
 
-- **Personagem:** o Dummy em estilo boneco articulado, montado por código com o `MeshBuilder` (peças rígidas facetadas, juntas pretas). Cor do jogador por time + preto; o Dummy do jogador começa **azul e preto**.
+- **Estilo geral: arcade de mecha dos anos 90.** Polígonos chapados com cores saturadas (cores em sRGB convertidas para linear), luz de céu fria e sol branco forte, painéis que brilham.
+- **Personagem:** o Dummy como piloto-mecha de 1,8 m, montado por código com o `MeshBuilder`: corpo branco, armadura azul, detalhes laranja, juntas escuras, viseira e painéis verde-ciano luminosos, ombreiras e pés grandes, mochila com propulsores. Cor da armadura por time.
 - **Veículos:** carcaças low-poly chapadas, cor por face, montadas por código a partir de peças que se reorganizam entre as formas.
 - **Mundo:** voxels de **0,5 m** com cor chapada por face, em chunks com malha otimizada (faces vizinhas fundidas). Combina com o low-poly do resto.
 - **Cidade: industrial-militar.** Concreto escuro, aço, janelas em fita, faixas de perigo amarelo e preto, faixas de luz ciano nas fachadas, luzes vermelhas em antenas e chaminés. Centro de torres em recuo (algumas gêmeas com passarela, helipontos no topo) e periferia de galpões, pátios de contêineres, tanques e data centers. Vias elevadas sobre as ruas.
@@ -80,7 +82,7 @@ Escala: mapas grandes como as ilhas do Polygonizer (a primeira ilha e a ilha urb
 
 ## 9. HUD, UI e UX
 
-Vida, forma atual e as disponíveis, munição, placar e minimapa. Roda de formas ao segurar o botão de transformar.
+Vida, forma atual e as disponíveis, munição, placar e minimapa. Roda de formas ao segurar o botão de transformar. **Estilo arcade:** barras grandes de vida do jogador e do inimigo no topo, cronômetro grande, mira circular, números em fonte monoespaçada e cores fortes (entra na M0.7).
 
 ## 10. Áudio
 
@@ -127,4 +129,5 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 - **21/11/2026, escala dos mapas:** mapas grandes como as ilhas do Polygonizer, com espaço para as aeronaves (Erick). A forma técnica (voxel em toda parte ou só nas áreas construídas) está em decisão na proposta do M0.
 - **21/11/2026, Dummy:** azul e preto (Erick).
 - **21/11/2026, cidade:** dobrada para 384 m; estilo **industrial-militar** no lugar do bairro residencial ("bucólico demais"): periferia de galpões e instalações industriais, torres mais altas e variadas, faixas de luz, vias elevadas, antenas e helipontos (Erick).
+- **22/11/2026, estilo arcade:** o jogo inteiro (Dummy, cidade e HUD) segue o estilo dos arcades de mecha dos anos 90; o Dummy fica com 1,8 m e passa a branco, azul e laranja com painéis luminosos (Erick).
 - **21/11/2026, M0:** mira pela câmera com torre; parede faz quicar; veículo atropela entulho; transformação mantém a velocidade (Erick).

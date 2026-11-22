@@ -1,9 +1,12 @@
 {
   "heightM": 1.8,
   "colors": {
-    "body": "#2f6fe0",
-    "bodyDark": "#2458b8",
-    "joint": "#1c1f26"
+    "white": "#eceef2",
+    "armor": "#2a56d8",
+    "accent": "#f28a1a",
+    "frame": "#5a606c",
+    "dark": "#23262d",
+    "glow": "#3dffb0"
   },
   "poses": {
     "tpose": {

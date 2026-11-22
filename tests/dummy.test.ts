@@ -58,4 +58,7 @@ test('dummy: pose determinística e cabe no buffer', () => {
   writePose(rig, P.bike, b);
   assert.deepEqual(a, b);
   assert.ok(rig.vertexCount < 6000, `Dummy pesado demais: ${rig.vertexCount} vértices`);
+  assert.equal(rig.glow.length, rig.vertexCount, 'um brilho por vértice');
+  const lit = rig.glow.filter((v) => v === 1).length;
+  assert.ok(lit > 0 && lit < rig.vertexCount * 0.1, `painéis luminosos: ${lit} vértices`);
 });
