@@ -46,11 +46,14 @@ Verbos do jogador:
 
 | Ação | Gamepad | Teclado/mouse | Toque |
 | --- | --- | --- | --- |
-| Mover / pilotar | Analógico esquerdo | WASD | Joystick virtual |
+| Direção | Analógico esquerdo | A/D ou ←/→ | Joystick virtual |
+| Acelerar | RT | W ou ↑ | Botão de acelerar |
+| Freio / ré | LT | S ou ↓ | Botão de freio |
+| Freio de mão (derrapar) | B | Espaço | Botão de derrapar |
 | Câmera / mira | Analógico direito | Mouse | Arrastar na metade direita |
 | Atirar | RT | Botão esquerdo | Botão de tiro |
 | Transformar | Y (segurar abre a roda) | Q / 1–6 | Botão de forma |
-| Ação da forma (turbo, subir) | A | Espaço | Botão de ação |
+| Ação da forma (turbo, subir) | A | Shift | Botão de ação |
 
 ## 6. O Dummy e as formas
 

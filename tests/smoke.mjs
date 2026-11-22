@@ -57,16 +57,21 @@ await waitFor(() => window.game.debugState().screen === 'playing');
 await btn(0, 0);
 await assert(await page.evaluate(() => !document.querySelector('.title')?.checkVisibility()), 'o título deveria sumir ao começar');
 
-// Acelera e vira por 3 s de jogo (tempo da simulação, não do relógio)
+// Acelera pela rua central por 3 s de jogo (tempo da simulação, não do relógio)
 const p0 = (await st()).pos;
 await btn(7, 1);
-await axis(0, 0.5);
 await waitFor(() => window.game.debugState().simTime > 3);
-await btn(7, 0);
-await axis(0, 0);
 const s1 = await st();
-await assert(s1.speed > 40 && Math.hypot(s1.pos.x - p0.x, s1.pos.z - p0.z) > 100, 'o veículo deveria acelerar e andar');
-await shot('02-voo.png');
+await btn(7, 0);
+await assert(s1.speed > 25 && Math.hypot(s1.pos.x - p0.x, s1.pos.z - p0.z) > 40 && s1.onGround && s1.wallHits === 0, 'o carro deveria acelerar pela rua sem bater');
+await shot('02-carro.png');
+// Curva com freio de mão (derrapagem)
+await axis(0, 1);
+await btn(1, 1);
+await waitFor((t) => window.game.debugState().simTime > t + 0.5, s1.simTime);
+await shot('02b-derrapagem.png');
+await axis(0, 0);
+await btn(1, 0);
 
 const dc = await drawCalls();
 console.log('draw calls =', dc);

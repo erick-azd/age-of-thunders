@@ -13,6 +13,11 @@ export class Arena implements WorldQuery {
     return Math.max(this.terrain.groundHeight(x, z), this.voxels.topAt(x, z));
   }
 
+  /** Piso para veículos: o maior entre o terreno e o topo de voxel que não passa de `yMax`. */
+  floorAt(x: number, z: number, yMax: number): number {
+    return Math.max(this.terrain.groundHeight(x, z), this.voxels.floorBelow(x, z, yMax));
+  }
+
   waterHeight(x: number, z: number): number { return this.terrain.waterHeight(x, z); }
 
   solidAt(x: number, y: number, z: number): boolean {

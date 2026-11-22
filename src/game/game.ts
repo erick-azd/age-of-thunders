@@ -1,39 +1,29 @@
 import * as THREE from 'three';
 import dummyJson from '../../data/config/dummy.json';
-import playerJson from '../../data/config/player.json';
+import carJson from '../../data/config/carro.json';
 import districtJson from '../../data/world/bairro.json';
 import worldJson from '../../data/world/mundo.json';
 import { Input } from '../core/input';
 import { EditorPanel } from '../editor/panel';
+import { buildCarModel } from '../procgen/car-model';
 import { DUMMY_SPECS, DummySchema, buildDummyRig } from '../procgen/dummy';
 import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors, materialGlow } from '../procgen/district';
 import { MeshBuilder, hexToRgb } from '../procgen/mesh-builder';
 import { Terrain, WorldSchema } from '../procgen/terrain';
 import { meshRegion } from '../procgen/voxel-mesher';
 import { flatMaterial, toGeometry } from '../render/mesh-utils';
+import { CarView } from '../render/car-view';
 import { DummyView } from '../render/dummy-view';
 import { createSky } from '../render/sky';
 import { Arena } from '../sim/arena';
 import { v3 } from '../sim/math';
-import { PLAYER_SPECS, type PlayerInput, PlayerParamsSchema, type PlayerState, createPlayer, neutralInput, stepPlayer } from '../sim/player';
+import { CAR_SPECS, type CarInput, CarParamsSchema, type CarState, createCar, forwardSpeed, neutralCarInput, stepCar } from '../sim/car';
 
 /** Passo fixo da simulação (60 Hz); a renderização interpola entre o passo anterior e o atual. */
 export const STEP = 1 / 60;
 
 type Screen = 'title' | 'playing';
 export interface DebugCamera { pos: [number, number, number]; look: [number, number, number]; fov?: number }
-
-/** Planador de exemplo feito com o MeshBuilder (frente para −Z). */
-function buildGlider(): MeshBuilder {
-  const b = new MeshBuilder();
-  const body = hexToRgb('#f2f3f6'), stripe = hexToRgb('#e0408a'), dark = hexToRgb('#2b3448');
-  b.push().translate(0, 0, 0).box(1.2, 1.0, 6, [body, dark, body]).pop();
-  b.push().translate(0, 0.55, -1).box(0.9, 0.5, 1.6, dark).pop();
-  b.push().translate(0, 0, 0.4).box(11, 0.18, 1.6, [body, dark, stripe]).pop();
-  b.push().translate(0, 0.9, 2.6).box(0.18, 1.6, 1.0, stripe).pop();
-  b.push().translate(0, 0.2, 2.8).box(3.6, 0.14, 0.8, body).pop();
-  return b;
-}
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
@@ -50,14 +40,17 @@ export class Game {
   private showcase = new THREE.Group();
   /** Vitrine do Dummy (M0.2): posição de cada pose, para câmeras e screenshots. */
   showcaseSpots: Record<string, [number, number, number]> = {};
-  readonly params = PlayerParamsSchema.parse(playerJson);
-  state: PlayerState;
-  private prev: PlayerState;
+  readonly params = CarParamsSchema.parse(carJson);
+  state: CarState;
+  private prev: CarState;
+  private spawn: { x: number; y: number; z: number; heading: number };
   private input = new Input(window);
-  private lastInput: PlayerInput = neutralInput();
+  private lastInput: CarInput = neutralCarInput();
+  private car!: CarView;
+  private camYaw = 0;
+  private renderDt = 0;
   private editor: EditorPanel;
   private sky: THREE.Mesh;
-  private playerMesh: THREE.Mesh;
   private titleEl: HTMLDivElement;
   private hudEl: HTMLDivElement;
   private acc = 0;
@@ -112,11 +105,13 @@ export class Game {
     this.scene.add(this.showcase);
     this.buildShowcase();
 
-    this.playerMesh = new THREE.Mesh(toGeometry(buildGlider().build()), mat);
-    this.scene.add(this.playerMesh);
-
-    this.state = createPlayer(v3(0, def.plateauHeight + 60, 600), 0, 40);
+    // Carro do jogador (M0.3): começa na rua central, ao sul, de frente para o centro (−Z).
+    this.car = this.makeCar();
+    this.scene.add(this.car.group);
+    this.spawn = { x: 2.5, y: def.plateauHeight + 0.5, z: 150, heading: 0 };
+    this.state = createCar(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading);
     this.prev = structuredClone(this.state);
+    this.camYaw = this.state.heading;
 
     // UI: título, HUD e editor F1.
     this.titleEl = document.createElement('div');
@@ -127,8 +122,8 @@ export class Game {
     this.hudEl.hidden = true;
     ui.append(this.titleEl, this.hudEl);
     this.editor = new EditorPanel(ui, [
-      { title: 'Veículo', specs: PLAYER_SPECS, values: this.params, file: 'config/player.json' },
-      { title: 'Dummy', specs: DUMMY_SPECS, values: this.dummyDef as unknown as Record<string, number>, file: 'config/dummy.json', onChange: () => this.buildShowcase() },
+      { title: 'Carro', specs: CAR_SPECS, values: this.params, file: 'config/carro.json' },
+      { title: 'Dummy', specs: DUMMY_SPECS, values: this.dummyDef as unknown as Record<string, number>, file: 'config/dummy.json', onChange: () => this.rebuildDummies() },
       {
         title: 'Cidade (regenera ao mudar)', specs: DISTRICT_SPECS, values: this.districtDef as unknown as Record<string, number>, file: 'world/bairro.json',
         onChange: () => { window.clearTimeout(this.districtTimer); this.districtTimer = window.setTimeout(() => this.buildDistrict(), 250); },
@@ -172,12 +167,20 @@ export class Game {
     const cx = 0, z = g.origin.z + g.sz * 0.5 + 12, y = this.terrain.groundHeight(cx, z);
     const rig = buildDummyRig(this.dummyDef);
     const dark = hexToRgb('#2a2d33'), seatC = hexToRgb('#3d4148'), steel = hexToRgb('#7c838a');
-    const seats: Record<string, number> = { car: 0.45, bike: 0.85 };
+    const seats: Record<string, number> = { bike: 0.85 };
     const order = ['tpose', 'standing', 'car', 'bike'];
     order.forEach((name, i) => {
       const pose = this.dummyDef.poses[name];
       if (!pose) return;
-      const x = cx + (i - (order.length - 1) / 2) * 2.6;
+      const x = cx + (i - (order.length - 1) / 2) * 2.6 + (name === 'car' ? 0.6 : name === 'bike' ? 1.6 : 0);
+      if (name === 'car') {
+        // O carro de verdade, estacionado e virado para +Z.
+        const parked = this.makeCar();
+        parked.update(x, y, z, Math.PI, 0, 0, 0, 0);
+        this.showcase.add(parked.group);
+        this.showcaseSpots[name] = [x, y, z];
+        return;
+      }
       const seatY = seats[name] ?? 0;
       const view = new DummyView(rig, this.mat);
       view.setPose(pose);
@@ -188,13 +191,7 @@ export class Game {
       if (!seatY) return;
       // Assento provisório (no espaço do personagem: frente em −Z).
       const b = new MeshBuilder();
-      if (name === 'car') {
-        b.push().translate(0, -0.12, 0.02).box(0.5, 0.12, 0.5, seatC).pop();
-        b.push().translate(0, 0.25, 0.28).rotateX(-0.2).box(0.5, 0.7, 0.1, seatC).pop();
-        b.push().translate(0, -0.3, 0).box(0.3, 0.3, 0.3, dark).pop();
-        b.push().translate(0, 0.42, -0.5).rotateX(0.35).torus(0.19, 0.025, 12, 4, dark).pop();
-        b.push().translate(0, -0.42, -0.78).box(0.5, 0.06, 0.3, dark).pop();
-      } else {
+      {
         b.push().translate(0, -0.08, 0.05).box(0.26, 0.1, 0.6, seatC).pop();
         b.push().translate(0, 0.0, -0.45).box(0.3, 0.22, 0.45, steel).pop();
         b.push().translate(0, 0.35, -0.72).box(0.7, 0.04, 0.04, dark).pop();
@@ -206,6 +203,24 @@ export class Game {
       prop.rotation.y = Math.PI;
       this.showcase.add(prop);
     });
+  }
+
+  private makeCar(): CarView {
+    return new CarView(buildCarModel(this.dummyDef.colors), buildDummyRig(this.dummyDef), this.dummyDef.poses.car, this.mat);
+  }
+
+  /** Mudou o Dummy no editor: refaz a vitrine e o carro do jogador. */
+  private rebuildDummies(): void {
+    this.buildShowcase();
+    this.scene.remove(this.car.group);
+    this.car = this.makeCar();
+    this.scene.add(this.car.group);
+  }
+
+  private respawn(): void {
+    this.state = createCar(v3(this.spawn.x, this.spawn.y, this.spawn.z), this.spawn.heading);
+    this.prev = structuredClone(this.state);
+    this.camYaw = this.state.heading;
   }
 
   private resize(): void {
@@ -221,6 +236,7 @@ export class Game {
       const dt = Math.min(0.25, (now - last) / 1000);
       last = now;
       this.update(dt);
+      this.renderDt = dt;
       this.render();
       this.frames++;
       this.ready = true;
@@ -230,10 +246,11 @@ export class Game {
   }
 
   /** Um passo fixo da simulação. */
-  private step(inp: PlayerInput): void {
+  private step(inp: CarInput): void {
     this.prev = structuredClone(this.state);
-    stepPlayer(this.state, inp, this.params, this.world, STEP);
+    const ev = stepCar(this.state, inp, this.params, this.world, STEP);
     this.simTime += STEP;
+    if (ev.some((e) => e.type === 'water') || this.state.pos.y < -60) this.respawn();
   }
 
   private update(dt: number): void {
@@ -251,9 +268,9 @@ export class Game {
 
   private render(): void {
     const a = this.acc / STEP, s = this.state, p = this.prev;
-    const x = p.pos.x + (s.pos.x - p.pos.x) * a, y = p.pos.y + (s.pos.y - p.pos.y) * a, z = p.pos.z + (s.pos.z - p.pos.z) * a;
-    this.playerMesh.position.set(x, y, z);
-    this.playerMesh.rotation.set(0, -s.heading, 0);
+    const L = (u: number, v: number) => u + (v - u) * a;
+    const x = L(p.pos.x, s.pos.x), y = L(p.pos.y, s.pos.y), z = L(p.pos.z, s.pos.z), h = L(p.heading, s.heading);
+    this.car.update(x, y, z, h, L(p.pitch, s.pitch), L(p.roll, s.roll), L(p.wheelSpin, s.wheelSpin), L(p.steerVis, s.steerVis));
     if (this.debugCam) {
       const c = this.debugCam;
       this.camera.position.set(...c.pos);
@@ -261,14 +278,19 @@ export class Game {
       this.camera.updateProjectionMatrix();
       this.camera.lookAt(...c.look);
     } else {
-      // Câmera de perseguição simples (no Polygonizer: quadro em quaternion com slerp, ADR 0004).
-      const back = new THREE.Vector3(x - Math.sin(s.heading) * 24, y + 8, z + Math.cos(s.heading) * 24);
-      this.camPos.lerp(back, this.frames === 0 ? 1 : 0.12);
+      // Câmera de perseguição: segue o rumo com atraso (gira menos que o carro numa derrapagem).
+      let d = h - this.camYaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      // Suavização pelo tempo real (independe da taxa de quadros); a posição acompanha o carro sem atraso.
+      this.camYaw += d * (this.frames === 0 ? 1 : 1 - Math.exp(-5 * this.renderDt));
+      const fx = Math.sin(this.camYaw), fz = -Math.cos(this.camYaw);
+      this.camPos.set(x - fx * 7.5, y + 3.1, z - fz * 7.5);
       this.camera.position.copy(this.camPos);
-      this.camera.lookAt(x, y + 2, z);
+      if (this.camera.fov !== 65) { this.camera.fov = 65; this.camera.updateProjectionMatrix(); }
+      this.camera.lookAt(x + fx * 4, y + 1.3, z + fz * 4);
     }
     this.sky.position.copy(this.camera.position);
-    this.hudEl.textContent = `VEL ${s.speed.toFixed(0)} m/s   ALT ${(s.pos.y - this.world.groundHeight(s.pos.x, s.pos.z)).toFixed(0)} m${s.crashed ? '   ACIDENTE' : ''}`;
+    this.hudEl.textContent = `${Math.abs(forwardSpeed(s) * 3.6).toFixed(0).padStart(3, ' ')} km/h${s.onGround ? '' : '   NO AR'}`;
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -277,14 +299,14 @@ export class Game {
     let triangles = 0;
     for (const m of this.districtMeshes) triangles += m.geometry.getAttribute('position').count / 3;
     return {
-      ready: this.ready, screen: this.screen, simTime: this.simTime, pos: { ...this.state.pos }, speed: this.state.speed, crashed: this.state.crashed, editorOpen: this.editor.open,
+      ready: this.ready, screen: this.screen, simTime: this.simTime, pos: { ...this.state.pos }, heading: this.state.heading, speed: forwardSpeed(this.state), onGround: this.state.onGround, wallHits: this.state.wallHits, editorOpen: this.editor.open,
       showcase: this.showcaseSpots,
       district: { buildings: this.district.buildings.length, sites: this.district.sites.length, viaducts: this.district.viaducts.length, meshes: this.districtMeshes.length, triangles },
     };
   }
   debugCamera(c: DebugCamera | null): void { this.debugCam = c; }
   /** Avança a simulação sem renderizar, com a última entrada (ou a dada). */
-  debugAdvance(seconds: number, inp?: Partial<PlayerInput>): void {
+  debugAdvance(seconds: number, inp?: Partial<CarInput>): void {
     const i = { ...this.lastInput, ...inp };
     for (let t = 0; t < seconds; t += STEP) this.step(i);
   }

@@ -74,6 +74,20 @@ export class VoxelGrid {
     return -Infinity;
   }
 
+  /**
+   * Piso sob (x, z) que não passa de `yMax` (m): topo do voxel sólido mais alto cujo topo ≤ yMax.
+   * −Infinity se não houver. É o que deixa o carro subir meio-fio e andar sob a via elevada.
+   */
+  floorBelow(x: number, z: number, yMax: number): number {
+    const i = this.toVoxelX(x), k = this.toVoxelZ(z);
+    if (i < 0 || k < 0 || i >= this.sx || k >= this.sz) return -Infinity;
+    for (let y = Math.min(this.sy - 1, Math.floor((yMax - this.origin.y) / VOXEL + 1e-6) - 1); y >= 0; y--) {
+      // Só é piso se o voxel de cima estiver vazio: o meio de uma parede não serve de degrau.
+      if (this.get(i, y, k) !== 0 && this.get(i, y + 1, k) === 0) return this.origin.y + (y + 1) * VOXEL;
+    }
+    return -Infinity;
+  }
+
   /** Altura (em voxels) logo acima do chunk ocupado mais alto na coluna de chunks dada. */
   chunkColumnTop(cx: number, cz: number): number {
     for (let cy = this.ncy - 1; cy >= 0; cy--) if (this.chunks[(cy * this.ncz + cz) * this.ncx + cx]) return (cy + 1) * CHUNK;
