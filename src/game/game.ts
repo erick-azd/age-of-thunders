@@ -8,6 +8,8 @@ import morphJson from '../../data/config/transformacao.json';
 import districtJson from '../../data/world/bairro.json';
 import worldJson from '../../data/world/mundo.json';
 import { Input } from '../core/input';
+import { TouchControls } from '../core/touch';
+import { type Profile, chooseProfile } from './profile';
 import { EditorPanel } from '../editor/panel';
 import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors, materialGlow } from '../procgen/district';
 import { DUMMY_SPECS, type DummyDef, DummySchema, buildDummyRig } from '../procgen/dummy';
@@ -98,10 +100,20 @@ export class Game {
   frames = 0;
   ready = false;
   debugCam: DebugCamera | null = null;
+  /** Perfil visual (padrão ou celular) e medidor de desempenho (F3). */
+  readonly profile: Profile = chooseProfile();
+  private perfEl!: HTMLDivElement;
+  private perfOn = false;
+  private f3Down = false;
+  private fps = 60;
+  private frameMs = 16.7;
+  private perfT = 0;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    const pr = this.profile;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: pr.antialias });
+    this.renderer.setPixelRatio(Math.min(pr.pixelRatioMax, window.devicePixelRatio));
+    this.camera.far = pr.far;
     const def = WorldSchema.parse(worldJson);
     this.terrain = new Terrain(def).generate();
     const P = def.palette;
@@ -109,7 +121,7 @@ export class Game {
     // Céu, neblina e luz com a paleta do mundo.
     this.sky = createSky(P.skyZenith, P.skyHorizon, P.skyGround);
     this.scene.add(this.sky);
-    this.scene.fog = new THREE.Fog(P.skyHorizon, 1200, 5500);
+    this.scene.fog = new THREE.Fog(P.skyHorizon, pr.fogNear, pr.fogFar);
     // Luz arcade (ADR 0005): céu frio e chão neutro, sol branco forte; brancos ficam brancos.
     this.scene.add(new THREE.HemisphereLight('#e4f0ff', '#8c8478', 1.7));
     const sun = new THREE.DirectionalLight('#ffffff', 2.1);
@@ -144,7 +156,7 @@ export class Game {
 
     // Efeitos do combate (ADR 0009) e alvos (ADR 0010).
     this.bolts = new Bolts(this.dummyDef.colors.glow);
-    this.debris = new Debris(300);
+    this.debris = new Debris(pr.debrisMax);
     this.flashes = new Flashes();
     this.targetsView = new Targets(mat, this.dummyDef.colors);
     this.scene.add(this.bolts.mesh, this.debris.mesh, this.flashes.mesh, this.targetsView.mesh);
@@ -158,7 +170,16 @@ export class Game {
     this.titleEl.innerHTML = '<h1>Age of Thunders</h1><p>A / Enter para começar · F1 abre o editor</p>';
     ui.append(this.titleEl);
     this.hud = new Hud(ui);
-    canvas.addEventListener('click', () => { if (this.screen === 'playing' && !this.input.locked) canvas.requestPointerLock?.(); });
+    if (pr.touch) {
+      this.input.touch = new TouchControls(ui);
+      document.body.classList.add('touch-on');
+      canvas.addEventListener('pointerdown', () => this.input.touch?.tap());
+      this.titleEl.querySelector('p')!.textContent = 'Toque para começar';
+    } else canvas.addEventListener('click', () => { if (this.screen === 'playing' && !this.input.locked) canvas.requestPointerLock?.(); });
+    this.perfEl = document.createElement('div');
+    this.perfEl.className = 'perf';
+    ui.append(this.perfEl);
+    this.perfOn = pr.showPerf;
     this.editor = new EditorPanel(ui, [
       { title: 'Carro', specs: CAR_SPECS, values: this.params, file: 'config/carro.json' },
       { title: 'Moto', specs: CAR_SPECS, values: this.bikeParams, file: 'config/moto.json' },
@@ -331,6 +352,11 @@ export class Game {
     const f1 = this.input.has('F1');
     if (f1 && !this.f1Down) this.editor.toggle();
     this.f1Down = f1;
+    const f3 = this.input.has('F3');
+    if (f3 && !this.f3Down) this.perfOn = !this.perfOn;
+    this.f3Down = f3;
+    // Desempenho: média móvel do tempo de quadro.
+    if (dt > 0) { this.frameMs += (dt * 1000 - this.frameMs) * 0.05; this.fps = 1000 / this.frameMs; }
     if (this.screen === 'title') {
       if (this.input.confirmPressed()) { this.screen = 'playing'; this.titleEl.hidden = true; }
       return;
@@ -422,13 +448,20 @@ export class Game {
     this.stats.debrisKicked += this.debris.update(this.renderDt, (qx, qz, ym) => this.world.floorAt(qx, qz, ym), { x: px, y: py, z: pz, vx: sp.x, vz: sp.z, radius: player.veh.physForm === 'car' ? 1.8 : 1.0 });
     this.hud.update(this.screen === 'playing' && !this.debugCam, this.match, forwardSpeed(player.veh), this.combat.targets);
     this.renderer.render(this.scene, this.camera);
+    this.perfT -= this.renderDt;
+    this.perfEl.hidden = !this.perfOn;
+    if (this.perfOn && this.perfT <= 0) {
+      this.perfT = 0.25;
+      const info = this.renderer.info.render;
+      this.perfEl.textContent = `${this.fps.toFixed(0)} fps · ${this.frameMs.toFixed(1)} ms · ${info.calls} dc · ${(info.triangles / 1000).toFixed(0)}k tri · ${this.profile.name}`;
+    }
   }
 
   // ---- API de depuração (smoke test e ferramentas) ----
   debugState() {
     const s = this.state, f = this.match.fighters;
     return {
-      ready: this.ready, screen: this.screen, simTime: this.simTime, form: s.form, physForm: s.physForm, morphT: s.morphT, lean: s.lean,
+      ready: this.ready, screen: this.screen, profile: this.profile.name, touch: this.profile.touch, fps: this.fps, frameMs: this.frameMs, simTime: this.simTime, form: s.form, physForm: s.physForm, morphT: s.morphT, lean: s.lean,
       pos: { ...s.pos }, heading: s.heading, speed: forwardSpeed(s), onGround: s.onGround, wallHits: s.wallHits, editorOpen: this.editor.open,
       showcase: this.showcaseSpots,
       tower: this.towerCenter(),

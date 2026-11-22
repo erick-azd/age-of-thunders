@@ -1,4 +1,5 @@
 import type { CarInput } from '../sim/car';
+import type { TouchControls } from './touch';
 
 /**
  * Entrada: gamepad (mapeamento "standard") e teclado. Devolve a entrada da sim (pura) a cada passo.
@@ -16,6 +17,8 @@ export class Input {
   private mouseFire = false;
   /** O mouse está preso no jogo (clique no jogo para prender; Esc solta). */
   locked = false;
+  /** Controles de toque, quando ligados (celular). */
+  touch: TouchControls | null = null;
 
   constructor(target: Window) {
     target.addEventListener('keydown', (e) => {
@@ -49,6 +52,13 @@ export class Input {
       brake = Math.max(brake, p.buttons[6]?.value ?? 0);
       handbrake = handbrake || !!p.buttons[1]?.pressed;
     }
+    const t = this.touch;
+    if (t) {
+      steer = steer || t.steer;
+      throttle = Math.max(throttle, t.throttle);
+      brake = Math.max(brake, t.brake);
+      handbrake = handbrake || t.handbrake;
+    }
     return { steer, throttle, brake, handbrake };
   }
 
@@ -57,7 +67,7 @@ export class Input {
     const now = this.keys.has('Enter') || !!this.pad()?.buttons[0]?.pressed;
     const edge = now && !this.prevA;
     this.prevA = now;
-    return edge;
+    return (this.touch?.consumeTap() ?? false) || edge;
   }
 
   /** Troca de forma (Tab ou Y) acabou de ser apertada. */
@@ -65,19 +75,20 @@ export class Input {
     const now = this.keys.has('Tab') || this.keys.has('KeyQ') || !!this.pad()?.buttons[3]?.pressed;
     const edge = now && !this.prevForm;
     this.prevForm = now;
-    return edge;
+    return (this.touch?.consumeForm() ?? false) || edge;
   }
 
   /** Atirar (segurar): clique esquerdo com o mouse preso, F, RB (5) ou X (2). */
   fireHeld(): boolean {
     const p = this.pad();
-    return this.mouseFire || this.keys.has('KeyF') || !!p?.buttons[5]?.pressed || !!p?.buttons[2]?.pressed;
+    return this.mouseFire || this.keys.has('KeyF') || !!p?.buttons[5]?.pressed || !!p?.buttons[2]?.pressed || !!this.touch?.fire;
   }
 
   /** Mira: movimento do mouse (px) desde a última leitura e analógico direito (−1 a 1). */
   readAim(): { mouseX: number; mouseY: number; stickX: number; stickY: number } {
     const p = this.pad(), dz = (v: number) => (Math.abs(v) < 0.15 ? 0 : v);
-    const out = { mouseX: this.mouseDX, mouseY: this.mouseDY, stickX: dz(p?.axes[2] ?? 0), stickY: dz(p?.axes[3] ?? 0) };
+    const t = this.touch?.consumeAim() ?? { dx: 0, dy: 0 };
+    const out = { mouseX: this.mouseDX + t.dx * 1.6, mouseY: this.mouseDY + t.dy * 1.6, stickX: dz(p?.axes[2] ?? 0), stickY: dz(p?.axes[3] ?? 0) };
     this.mouseDX = this.mouseDY = 0;
     return out;
   }

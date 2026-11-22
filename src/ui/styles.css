@@ -46,3 +46,40 @@ html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; fon
 .hud-score { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font: 700 15px/1.1 monospace; letter-spacing: 1px; }
 .hud-score b { color: #ffd84a; font-size: 20px; }
 .hud-banner { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%) skewX(-12deg); font: 900 30px/1 monospace; color: #ff3b30; background: rgba(10, 14, 30, 0.7); border: 2px solid #ff3b30; padding: 8px 18px; letter-spacing: 2px; }
+
+/* Controles de toque (M0.7b, ADR 0011): joystick, área de mira e botões. */
+.touch { position: absolute; inset: 0; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch-aim { position: absolute; right: 0; top: 70px; width: 55%; bottom: 0; pointer-events: auto; touch-action: none; }
+.touch-stick { position: absolute; left: 28px; bottom: 28px; width: 150px; height: 150px; border-radius: 50%; pointer-events: auto; touch-action: none;
+  background: radial-gradient(circle, rgba(61, 255, 176, 0.12), rgba(10, 14, 30, 0.45)); border: 3px solid rgba(61, 255, 176, 0.7); }
+.touch-knob { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
+  background: rgba(61, 255, 176, 0.75); border: 3px solid #fff; box-shadow: 0 0 10px rgba(61, 255, 176, 0.8); }
+.touch-btn { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid #fff; color: #fff;
+  font: 900 13px/1 monospace; letter-spacing: 1px; text-shadow: 0 2px 0 #000; background: rgba(10, 14, 30, 0.55); }
+.touch-btn.on { filter: brightness(1.7); transform: scale(0.94); }
+.touch-btn.fire { right: 28px; bottom: 28px; width: 104px; height: 104px; background: rgba(255, 106, 31, 0.7); }
+.touch-btn.drift { right: 146px; bottom: 30px; width: 76px; height: 76px; background: rgba(42, 86, 216, 0.7); }
+.touch-btn.form { right: 46px; bottom: 148px; width: 70px; height: 70px; background: rgba(61, 255, 176, 0.45); }
+body.touch-on .hud-form { left: 196px; bottom: 30px; }
+body.touch-on .hud-score { right: 16px; top: 64px; bottom: auto; }
+
+/* Medidor de desempenho (F3 ou ?fps=1; ligado no perfil celular). */
+.perf { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); font: 700 12px/1 monospace; color: #fff;
+  background: rgba(10, 14, 30, 0.6); padding: 3px 8px; border-radius: 3px; white-space: nowrap; }
+
+/* Telas baixas (celular deitado): HUD mais compacto. */
+@media (max-height: 520px) {
+  .hud-top { top: 8px; gap: 10px; }
+  .hud-timer { font-size: 22px; padding: 1px 8px; }
+  .hud-num { font-size: 15px; min-width: 32px; }
+  .hud-tag { font-size: 10px; letter-spacing: 1px; }
+  .hud-track { height: 11px; }
+  .hud-form b { font-size: 14px; }
+  .hud-form span { font-size: 19px; }
+  .hud-score { font-size: 11px; }
+  .hud-score b { font-size: 14px; }
+  body.touch-on .hud-score { top: 44px; }
+  .perf { top: 40px; font-size: 10px; }
+  .touch-btn.drift { font-size: 10px; letter-spacing: 0; }
+  .hud-banner { font-size: 20px; }
+}

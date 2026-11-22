@@ -1,0 +1,20 @@
+{
+  "padrao": {
+    "pixelRatioMax": 2,
+    "antialias": true,
+    "far": 12000,
+    "fogNear": 1200,
+    "fogFar": 5500,
+    "debrisMax": 300,
+    "showPerf": false
+  },
+  "celular": {
+    "pixelRatioMax": 1.25,
+    "antialias": false,
+    "far": 1600,
+    "fogNear": 350,
+    "fogFar": 1500,
+    "debrisMax": 120,
+    "showPerf": true
+  }
+}

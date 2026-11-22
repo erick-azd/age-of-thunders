@@ -41,21 +41,22 @@ Verbos do jogador:
 - **Mundo:** mapa híbrido. A ilha é terreno low-poly (heightfield); tudo o que é construído é voxel de **0,5 m**, destrutível, com cor chapada por face e malha otimizada.
 - **Cidade: industrial-militar.** Concreto escuro, aço, janelas em fita, faixas de perigo amarelo e preto, faixas de luz verde-ciano nas fachadas, luzes vermelhas em antenas e chaminés. Centro de torres em recuo (algumas gêmeas com passarela, helipontos no topo) e periferia de galpões, pátios de contêineres, tanques e data centers. Duas vias elevadas sobre as ruas.
 - **Orçamento:** até 150 draw calls por quadro (medido: ~84 na vista da cidade inteira); 30 FPS no celular; build em HTML único (~600 KB).
-- **Perfis visuais:** padrão e celular (distância de visão e entulho menores no celular).
+- **Perfis visuais:** padrão e celular (`data/config/perfis.json`). O celular usa menos pixels, sem antialias, visão de 1,6 km com neblina e menos entulho. Escolha automática pela tela de toque, ou `?perfil=celular|padrao` na URL. Medidor de FPS: F3, `?fps=1`, ligado no celular.
 
 ## 5. Controles
 
-| Ação | Gamepad | Teclado/mouse | Toque (M0.7) |
+| Ação | Gamepad | Teclado/mouse | Toque |
 | --- | --- | --- | --- |
-| Direção | Analógico esquerdo | A/D ou ←/→ | Joystick virtual |
-| Acelerar | RT | W ou ↑ | Botão de acelerar |
-| Freio / ré | LT | S ou ↓ | Botão de freio |
-| Freio de mão (derrapar) | B | Espaço | Botão de derrapar |
+| Direção | Analógico esquerdo | A/D ou ←/→ | Joystick à esquerda (para os lados) |
+| Acelerar | RT | W ou ↑ | Joystick para cima |
+| Freio / ré | LT | S ou ↓ | Joystick para baixo |
+| Freio de mão (derrapar) | B | Espaço | Botão DERRAPAR |
 | Câmera / mira | Analógico direito | Mouse (clique no jogo para prender; Esc solta) | Arrastar na metade direita |
-| Atirar | RB ou X | Clique esquerdo ou F | Botão de tiro |
-| Transformar | Y (no futuro, segurar abre a roda de formas) | Tab ou Q | Botão de forma |
-| Começar | A | Enter | Toque |
+| Atirar | RB ou X | Clique esquerdo ou F | Botão TIRO |
+| Transformar | Y (no futuro, segurar abre a roda de formas) | Tab ou Q | Botão FORMA |
+| Começar | A | Enter | Tocar na tela |
 | Editor | — | F1 | — |
+| Medidor de FPS | — | F3 | ligado no perfil celular |
 
 ## 6. O Dummy e as formas
 
@@ -134,7 +135,8 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 | M0.5 | Transformação animada por peças | Pronta |
 | M0.6 | Canhão com mira pela câmera, crateras e entulho | Pronta |
 | M0.7a | Vida e dano, alvos, bot que patrulha e atira, HUD arcade | Pronta |
-| M0.7b | Controles de toque, perfil de celular e medição de FPS | Próxima |
+| M0.7b | Controles de toque, perfil de celular e medidor de FPS | Pronta |
+| Portão | O Erick joga no desktop e no celular e aprova | Aguardando |
 
 ## 14. Riscos
 

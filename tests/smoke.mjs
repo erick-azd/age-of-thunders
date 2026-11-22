@@ -164,6 +164,54 @@ const dcCity = await drawCalls();
 console.log('draw calls (bairro) =', dcCity);
 await assert(dcCity <= 150, `acima do orçamento de 150 draw calls no bairro: ${dcCity}`);
 
+// Celular (M0.7b): tela de 390 × 844 com toque, perfil celular; toca para começar, joystick para
+// cima acelera, botão TIRO atira, botão FORMA transforma; mede draw calls e tempo de quadro.
+const phone = await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+const mp = await phone.newPage();
+mp.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+mp.on('pageerror', (e) => errors.push(String(e)));
+await page.close();
+await mp.goto(pathToFileURL(join(root, 'dist/age-of-thunders.html')).href + '?perfil=celular&toque=1', { timeout: 180000 });
+await mp.waitForFunction(() => window.game?.ready === true, null, { timeout: 120000 });
+const mst = () => mp.evaluate(() => window.game.debugState());
+const m1 = await mst();
+await assert(m1.profile === 'celular' && m1.touch, 'deveria abrir no perfil celular com toque');
+await mp.touchscreen.tap(420, 120);
+await mp.waitForFunction(() => window.game.debugState().screen === 'playing');
+// Joystick: segura e arrasta para cima por 2 s de jogo.
+const stick = await mp.locator('.touch-stick').boundingBox();
+const sx = stick.x + stick.width / 2, sy = stick.y + stick.height / 2;
+await mp.mouse.move(sx, sy);
+await mp.mouse.down();
+await mp.mouse.move(sx, sy - 55, { steps: 4 });
+const tA = (await mst()).simTime;
+await mp.waitForFunction((t) => window.game.debugState().simTime > t + 2, tA);
+const m2 = await mst();
+await mp.mouse.up();
+await assert(m2.speed > 10, `o joystick deveria acelerar (velocidade ${m2.speed.toFixed(1)})`);
+// TIRO e FORMA
+const fireBtn = await mp.locator('.touch-btn.fire').boundingBox();
+await mp.mouse.move(fireBtn.x + 50, fireBtn.y + 50);
+await mp.mouse.down();
+await mp.waitForFunction(() => window.game.debugState().combat.shots >= 2);
+await mp.mouse.up();
+const formBtn = await mp.locator('.touch-btn.form').boundingBox();
+await mp.mouse.move(formBtn.x + 30, formBtn.y + 30);
+await mp.mouse.down();
+await mp.waitForFunction(() => window.game.debugState().form === 'bike');
+await mp.mouse.up();
+// Desempenho no perfil celular (SwiftShader, sem GPU: os números só servem de comparação).
+const mdc = await mp.evaluate(async () => {
+  const g = window.game, r = g.renderer;
+  await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+  return r.info.render.calls;
+});
+const perf = await mst();
+console.log('celular:', JSON.stringify({ drawCalls: mdc, frameMs: Number(perf.frameMs.toFixed(1)), triCidade: perf.district.triangles }));
+await assert(mdc <= 150, `acima do orçamento no celular: ${mdc}`);
+await mp.screenshot({ path: join(shots, '14-celular.png') });
+await phone.close();
+
 await browser.close();
 const fatal = errors.filter((e) => !/pointer ?lock|AudioContext|GPU stall|GL Driver Message/i.test(e));
 if (fatal.length) { console.error('erros no console:', [...new Set(fatal)].slice(0, 5)); process.exit(1); }
