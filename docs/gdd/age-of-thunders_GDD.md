@@ -163,5 +163,5 @@ TypeScript + Three.js + Zod, build com esbuild em arquivo único, testes com nod
 - **22/11/2026, estilo arcade:** o jogo inteiro (Dummy, cidade e HUD) segue o estilo dos arcades de mecha dos anos 90; o Dummy fica com 1,8 m e passa a branco, azul e laranja com painéis luminosos (substitui o "azul e preto" de 21/11) (Erick).
 - **22/11/2026, controle:** mão esquerda pilota (analógico esquerdo, LT acelera, LB freia e dá ré), mão direita combate (analógico direito mira, RT atira); em teste (Erick).
 - **22/11/2026, portão do M0:** aprovado no desktop; merge do `m0` na `main`. O teste no celular fica pendente e será medido no M1 (Erick).
-- **22/11/2026, M1:** mata-mata com 3 bots, vence quem fizer 10 abates ou o placar em 5 min; munição limitada com caixas pela cidade; hover anda na água e na terra (mais devagar na terra); tanque esmaga muros e cercas de até 1 m; áudio sintetizado por código (Erick).
+- **22/11/2026, M1:** mata-mata com 3 bots, vence quem fizer 10 abates ou o placar em 5 min; munição limitada com caixas pela cidade; hover anda na água e na terra (mais devagar na terra); tanque esmaga muros e cercas de até 1 m; áudio sintetizado por código; no desabamento, o pedaço solto cai inteiro e quebra em entulho (Erick).
 - **22/11/2026, repositório:** github.com/erick-azd/age-of-thunders; merge do `m0` na `main` só com a aprovação do portão (Erick).
