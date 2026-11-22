@@ -22,6 +22,10 @@ export const WorldSchema = z.object({
   coastNoise: z.number().min(0).max(0.5).default(0.2),
   seaFloor: z.number().default(-40),
   trees: z.number().int().min(0).max(20000).default(1500),
+  /** Platô quadrado no centro para o bairro de voxels: meia-largura plana, faixa de mistura e altura. */
+  plateauHalf: z.number().min(0).max(5000).default(0),
+  plateauBlend: z.number().min(1).max(2000).default(150),
+  plateauHeight: z.number().min(1).max(500).default(12),
   palette: z.object({
     sand: Hex, grass: z.array(Hex).min(1), rock: Hex, snow: Hex, forest: Hex, ocean: Hex,
     skyZenith: Hex, skyHorizon: Hex, skyGround: Hex,
@@ -54,7 +58,15 @@ export class Terrain implements WorldQuery {
     const mask = smoothstep(1.0, 0.75, r);
     const hills = Math.pow(n.fbm(x * 0.0012 + 11, zz * 0.0012 + 5, 5) * 0.5 + 0.5, 1.6) * d.hillHeight;
     const ridge = n.ridged(x * 0.001 + 40, zz * 0.001 - 9, 4) * d.hillHeight * 0.35;
-    return lerp(d.seaFloor, 6 + hills + ridge * smoothstep(0.55, 0.2, r), mask);
+    const h = lerp(d.seaFloor, 6 + hills + ridge * smoothstep(0.55, 0.2, r), mask);
+    return d.plateauHalf > 0 ? lerp(h, d.plateauHeight, this.plateauWeight(x, zz)) : h;
+  }
+
+  /** 1 dentro do platô do bairro, caindo suavemente até 0 na faixa de mistura. */
+  plateauWeight(x: number, zz: number): number {
+    const d = this.def;
+    if (d.plateauHalf <= 0) return 0;
+    return smoothstep(d.plateauBlend, 0, Math.max(Math.abs(x), Math.abs(zz)) - d.plateauHalf);
   }
 
   generate(): this {
@@ -124,6 +136,7 @@ export class Terrain implements WorldQuery {
       const h = this.groundHeight(x, zz);
       if (h < 5 || h > this.def.hillHeight * 0.8 || this.groundNormalY(x, zz) < 0.85) continue;
       if (this.noise.fbm(x * 0.002 + 70, zz * 0.002, 3) < 0.05) continue;
+      if (this.plateauWeight(x, zz) > 0.5) continue; // nada de árvore no bairro
       out.push({ x, y: h, z: zz, s, rot });
     }
     this.trees = out;

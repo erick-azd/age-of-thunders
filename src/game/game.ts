@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import playerJson from '../../data/config/player.json';
+import districtJson from '../../data/world/bairro.json';
 import worldJson from '../../data/world/mundo.json';
 import { Input } from '../core/input';
 import { EditorPanel } from '../editor/panel';
+import { DISTRICT_SPECS, type District, DistrictSchema, generateDistrict, materialColors } from '../procgen/district';
 import { MeshBuilder, hexToRgb } from '../procgen/mesh-builder';
 import { Terrain, WorldSchema } from '../procgen/terrain';
+import { meshRegion } from '../procgen/voxel-mesher';
 import { flatMaterial, toGeometry } from '../render/mesh-utils';
 import { createSky } from '../render/sky';
+import { Arena } from '../sim/arena';
 import { v3 } from '../sim/math';
 import { PLAYER_SPECS, type PlayerInput, PlayerParamsSchema, type PlayerState, createPlayer, neutralInput, stepPlayer } from '../sim/player';
 
@@ -33,6 +37,12 @@ export class Game {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(60, 1, 0.5, 12000);
   readonly terrain: Terrain;
+  readonly districtDef = DistrictSchema.parse(districtJson);
+  district!: District;
+  world!: Arena;
+  private districtMeshes: THREE.Mesh[] = [];
+  private districtTimer = 0;
+  private mat = flatMaterial();
   readonly params = PlayerParamsSchema.parse(playerJson);
   state: PlayerState;
   private prev: PlayerState;
@@ -69,7 +79,7 @@ export class Game {
     this.scene.add(sun);
 
     // Terreno (1 draw call), mar, árvores instanciadas (1 draw call).
-    const mat = flatMaterial();
+    const mat = this.mat;
     this.scene.add(new THREE.Mesh(toGeometry(this.terrain.mesh()), mat));
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: P.ocean }));
     sea.position.y = -0.2;
@@ -89,10 +99,13 @@ export class Game {
     trees.computeBoundingSphere();
     this.scene.add(trees);
 
+    // Bairro de voxels no platô central (mapa híbrido, ADR 0002).
+    this.buildDistrict();
+
     this.playerMesh = new THREE.Mesh(toGeometry(buildGlider().build()), mat);
     this.scene.add(this.playerMesh);
 
-    this.state = createPlayer(v3(0, this.terrain.groundHeight(0, 1200) + 80, 1200), 0, 40);
+    this.state = createPlayer(v3(0, def.plateauHeight + 60, 600), 0, 40);
     this.prev = structuredClone(this.state);
 
     // UI: título, HUD e editor F1.
@@ -103,10 +116,37 @@ export class Game {
     this.hudEl.className = 'hud';
     this.hudEl.hidden = true;
     ui.append(this.titleEl, this.hudEl);
-    this.editor = new EditorPanel(ui, [{ title: 'Veículo', specs: PLAYER_SPECS, values: this.params, file: 'config/player.json' }]);
+    this.editor = new EditorPanel(ui, [
+      { title: 'Veículo', specs: PLAYER_SPECS, values: this.params, file: 'config/player.json' },
+      {
+        title: 'Bairro (regenera ao mudar)', specs: DISTRICT_SPECS, values: this.districtDef as unknown as Record<string, number>, file: 'world/bairro.json',
+        onChange: () => { window.clearTimeout(this.districtTimer); this.districtTimer = window.setTimeout(() => this.buildDistrict(), 250); },
+      },
+    ]);
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
+  }
+
+  /** Gera (ou regenera) o bairro e suas malhas: uma por coluna de 32 × 32 m (1 draw call cada). */
+  buildDistrict(): void {
+    for (const m of this.districtMeshes) { this.scene.remove(m); m.geometry.dispose(); }
+    this.districtMeshes = [];
+    const def = this.districtDef, size = def.sizeM;
+    this.district = generateDistrict(def, v3(-size / 2, this.terrain.def.plateauHeight - 0.5, -size / 2));
+    if (this.world) this.world.voxels = this.district.grid;
+    else this.world = new Arena(this.terrain, this.district.grid);
+    const g = this.district.grid, colors = materialColors(def), COL = 64;
+    for (let cz = 0; cz < g.sz; cz += COL) for (let cx = 0; cx < g.sx; cx += COL) {
+      let top = 0;
+      for (let k = cz >> 5; k < Math.min(g.ncz, (cz + COL) >> 5); k++) for (let i = cx >> 5; i < Math.min(g.ncx, (cx + COL) >> 5); i++) top = Math.max(top, g.chunkColumnTop(i, k));
+      const data = meshRegion(g, cx, cz, Math.min(COL, g.sx - cx), Math.min(COL, g.sz - cz), colors, top);
+      if (!data.positions.length) continue;
+      const mesh = new THREE.Mesh(toGeometry(data), this.mat);
+      mesh.name = `bairro-${cx / COL}-${cz / COL}`;
+      this.scene.add(mesh);
+      this.districtMeshes.push(mesh);
+    }
   }
 
   private resize(): void {
@@ -133,7 +173,7 @@ export class Game {
   /** Um passo fixo da simulação. */
   private step(inp: PlayerInput): void {
     this.prev = structuredClone(this.state);
-    stepPlayer(this.state, inp, this.params, this.terrain, STEP);
+    stepPlayer(this.state, inp, this.params, this.world, STEP);
     this.simTime += STEP;
   }
 
@@ -169,13 +209,18 @@ export class Game {
       this.camera.lookAt(x, y + 2, z);
     }
     this.sky.position.copy(this.camera.position);
-    this.hudEl.textContent = `VEL ${s.speed.toFixed(0)} m/s   ALT ${(s.pos.y - this.terrain.groundHeight(s.pos.x, s.pos.z)).toFixed(0)} m${s.crashed ? '   ACIDENTE' : ''}`;
+    this.hudEl.textContent = `VEL ${s.speed.toFixed(0)} m/s   ALT ${(s.pos.y - this.world.groundHeight(s.pos.x, s.pos.z)).toFixed(0)} m${s.crashed ? '   ACIDENTE' : ''}`;
     this.renderer.render(this.scene, this.camera);
   }
 
   // ---- API de depuração (smoke test e ferramentas) ----
   debugState() {
-    return { ready: this.ready, screen: this.screen, simTime: this.simTime, pos: { ...this.state.pos }, speed: this.state.speed, crashed: this.state.crashed, editorOpen: this.editor.open };
+    let triangles = 0;
+    for (const m of this.districtMeshes) triangles += m.geometry.getAttribute('position').count / 3;
+    return {
+      ready: this.ready, screen: this.screen, simTime: this.simTime, pos: { ...this.state.pos }, speed: this.state.speed, crashed: this.state.crashed, editorOpen: this.editor.open,
+      district: { buildings: this.district.buildings.length, meshes: this.districtMeshes.length, triangles },
+    };
   }
   debugCamera(c: DebugCamera | null): void { this.debugCam = c; }
   /** Avança a simulação sem renderizar, com a última entrada (ou a dada). */

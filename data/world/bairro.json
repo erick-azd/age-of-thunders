@@ -1,0 +1,24 @@
+{
+  "id": "bairro",
+  "name": "Bairro Central",
+  "seed": 2077,
+  "sizeM": 256,
+  "heightM": 64,
+  "blockPitchM": 64,
+  "streetM": 10,
+  "sidewalkM": 3,
+  "floorM": 3,
+  "floorsMin": 2,
+  "floorsMax": 12,
+  "towerFloors": 18,
+  "palette": {
+    "asphalt": "#4a4d55",
+    "lane": "#e8e2c8",
+    "sidewalk": "#b9b4a8",
+    "roof": "#6d6a66",
+    "trim": "#3a3c44",
+    "glass": "#7fb4d6",
+    "antenna": "#d8423a",
+    "walls": ["#d9cbb0", "#c98f6b", "#e6e1d6", "#a9b8c4", "#cfb37a", "#b8806a", "#9aa59a"]
+  }
+}

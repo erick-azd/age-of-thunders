@@ -84,6 +84,26 @@ const f0 = await page.evaluate(() => window.game.frames);
 await waitFor((f) => window.game.frames >= f + 4, f0);
 await shot('04-aerea.png');
 
+// Bairro de voxels (M0.1): vista de cima em 3/4 e vista da rua
+await page.keyboard.down('F1'); // fecha o editor para as vistas
+await waitFor(() => !window.game.debugState().editorOpen);
+await page.keyboard.up('F1');
+const d = (await st()).district;
+console.log('bairro:', JSON.stringify(d));
+await assert(d.buildings >= 20 && d.meshes > 0, 'o bairro deveria ter prédios e malhas');
+const view = async (name, cam) => {
+  await page.evaluate((c) => window.game.debugCamera(c), cam);
+  const f = await page.evaluate(() => window.game.frames);
+  await waitFor((f) => window.game.frames >= f + 4, f);
+  await shot(name);
+};
+await view('05-bairro.png', { pos: [190, 110, 190], look: [-10, 14, -10], fov: 55 });
+await view('06-rua.png', { pos: [2, 16.2, 110], look: [0, 22, 0], fov: 65 });
+await view('07-ilha.png', { pos: [900, 420, 900], look: [0, 20, 0], fov: 55 });
+const dcCity = await drawCalls();
+console.log('draw calls (bairro) =', dcCity);
+await assert(dcCity <= 150, `acima do orçamento de 150 draw calls no bairro: ${dcCity}`);
+
 await browser.close();
 const fatal = errors.filter((e) => !/pointer ?lock|AudioContext|GPU stall|GL Driver Message/i.test(e));
 if (fatal.length) { console.error('erros no console:', [...new Set(fatal)].slice(0, 5)); process.exit(1); }
